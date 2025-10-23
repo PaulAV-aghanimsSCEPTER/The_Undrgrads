@@ -166,78 +166,91 @@ export default function Home() {
     setSelectedCustomer(updatedCustomer.name || selectedCustomer)
   }
 
-  const handleDownload = (type: "total" | "byDesign") => {
-    let content = ""
+const handleDownload = (type: "total" | "byDesign") => {
+  let content = ""
 
-    if (type === "total") {
-      // Group by color and size
-      const breakdown = orders.reduce(
-        (acc, order) => {
-          const key = `${order.color}-${order.size}`
-          if (!acc[key]) {
-            acc[key] = { color: order.color, size: order.size, quantity: 0 }
-          }
-          acc[key].quantity += 1
-          return acc
-        },
-        {} as Record<string, { color: string; size: string; quantity: number }>,
-      )
+  if (type === "total") {
+    // Group by color and size
+    const breakdown = orders.reduce((acc, order) => {
+      const key = `${order.color}-${order.size}`
+      if (!acc[key]) {
+        acc[key] = { color: order.color, size: order.size, quantity: 0 }
+      }
+      acc[key].quantity += 1
+      return acc
+    }, {} as Record<string, { color: string; size: string; quantity: number }>)
 
-      const sizeOrder = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"]
-      const sorted = Object.values(breakdown).sort((a, b) => {
-        if (a.color !== b.color) return a.color.localeCompare(b.color)
-        return sizeOrder.indexOf(a.size) - sizeOrder.indexOf(b.size)
-      })
+    const sizeOrder = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"]
+    const sorted = Object.values(breakdown).sort((a, b) => {
+      if (a.color !== b.color) return a.color.localeCompare(b.color)
+      return sizeOrder.indexOf(a.size) - sizeOrder.indexOf(b.size)
+    })
 
-      content =            "Total Ordered Tshirts\n"
-      content += "=============================================\n"
-      content +=     "COLOR   |     SIZES     |   QUANTITY\n"
-      content += "----------------------------------------------\n"
-      sorted.forEach((item) => {
-        content += `${item.color.padEnd(7)} | ${item.size.padEnd(13)} | ${item.quantity}\n`
-      })
-      content += "=============================================\n"
-    } else {
-      // Group by color, size, and design
-      const breakdown = orders.reduce(
-        (acc, order) => {
-          const key = `${order.color}-${order.size}-${order.design}`
-          if (!acc[key]) {
-            acc[key] = { color: order.color, size: order.size, design: order.design, quantity: 0 }
-          }
-          acc[key].quantity += 1
-          return acc
-        },
-        {} as Record<string, { color: string; size: string; design: string; quantity: number }>,
-      )
+    content = "Total Ordered Tshirts\n"
+    content += "========================================================\n"
+    content += "|   COLOR   |  SIZE  |  QUANTITY  |\n"
+    content += "|---------------------------------|\n"
 
-      const sizeOrder = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"]
-      const sorted = Object.values(breakdown).sort((a, b) => {
-        if (a.color !== b.color) return a.color.localeCompare(b.color)
-        const sizeCompare = sizeOrder.indexOf(a.size) - sizeOrder.indexOf(b.size)
-        if (sizeCompare !== 0) return sizeCompare
-        return a.design.localeCompare(b.design)
-      }) 
+    let lastColor = ""
+    sorted.forEach((item, i) => {
+      if (lastColor && lastColor !== item.color) {
+        content += "|---------------------------------|\n"
+      }
+      content += `|   ${item.color.padEnd(7)} |  ${item.size.padEnd(5)} |     ${String(item.quantity).padEnd(6)} |\n`
+      lastColor = item.color
 
-      content =         "Total Ordered Tshirts By Design\n"
-      content += "=======================================================\n"
-      content +=    "COLOR   |     SIZES     |   QUANTITY     | DESIGN\n"
-      content += "--------------------------------------------------------\n"
-      sorted.forEach((item) => {
-        content += `${item.color.padEnd(7)} | ${item.size.padEnd(13)} | ${String(item.quantity).padEnd(14)} | ${item.design}\n`
-      })
-      content += "========================================================\n"
-    }
+      if (i === sorted.length - 1) {
+        content += "========================================================\n"
+      }
+    })
+  } else {
+    // Group by color, size, and design
+    const breakdown = orders.reduce((acc, order) => {
+      const key = `${order.color}-${order.size}-${order.design}`
+      if (!acc[key]) {
+        acc[key] = { color: order.color, size: order.size, design: order.design, quantity: 0 }
+      }
+      acc[key].quantity += 1
+      return acc
+    }, {} as Record<string, { color: string; size: string; design: string; quantity: number }>)
 
-    // Create and download file
-    const element = document.createElement("a")
-    element.setAttribute("href", "data:text/plain;charset=utf-8," + encodeURIComponent(content))
-    element.setAttribute("download", type === "total" ? "tshirts-total.txt" : "tshirts-by-design.txt")
-    element.style.display = "none"
-    document.body.appendChild(element)
-    element.click()
-    document.body.removeChild(element)
+    const sizeOrder = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"]
+    const sorted = Object.values(breakdown).sort((a, b) => {
+      if (a.color !== b.color) return a.color.localeCompare(b.color)
+      const sizeCompare = sizeOrder.indexOf(a.size) - sizeOrder.indexOf(b.size)
+      if (sizeCompare !== 0) return sizeCompare
+      return a.design.localeCompare(b.design)
+    })
+
+    content = "Total Ordered Tshirts By Design\n"
+    content += "========================================================\n"
+    content += "|   COLOR   |  SIZE  |  QUANTITY  |   DESIGN   |\n"
+    content += "|-------------------------------------------------------|\n"
+
+    let lastColor = ""
+    sorted.forEach((item, i) => {
+      if (lastColor && lastColor !== item.color) {
+        content += "|-------------------------------------------------------|\n"
+      }
+      content += `|   ${item.color.padEnd(7)} |  ${item.size.padEnd(5)} |     ${String(item.quantity).padEnd(6)} |  ${item.design.padEnd(8)} |\n`
+      lastColor = item.color
+
+      if (i === sorted.length - 1) {
+        content += "========================================================\n"
+      }
+    })
   }
+
+  // Download the file
+  const element = document.createElement("a")
+  element.setAttribute("href", "data:text/plain;charset=utf-8," + encodeURIComponent(content))
+  element.setAttribute("download", type === "total" ? "tshirts-total.txt" : "tshirts-by-design.txt")
+  element.style.display = "none"
+  document.body.appendChild(element)
+  element.click()
+  document.body.removeChild(element)
+}
+
 
   const handleSummaryCardClick = (type: "total" | "designs") => {
     if (type === "total") {
