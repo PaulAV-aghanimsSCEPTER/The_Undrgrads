@@ -17,7 +17,7 @@ interface ViewOrderDialogProps {
   onAddMoreOrder: (order: any) => void
   onDeleteOrder: (id: number) => void
   onEditOrder: (order: any) => void
-  onMarkDefective: (id: number) => void
+  onMarkDefective: (id: number, note: string) => void // 🔹 add note support
   onEditCustomer: (updatedCustomer: any) => void
 }
 
@@ -48,6 +48,11 @@ export default function ViewOrderDialog({
     design: designs[0],
   })
 
+  // 🔹 For defective note modal
+  const [defectiveDialogOpen, setDefectiveDialogOpen] = useState(false)
+  const [selectedOrderId, setSelectedOrderId] = useState<number | null>(null)
+  const [defectiveNote, setDefectiveNote] = useState("")
+
   useEffect(() => {
     if (open && customerOrders.length > 0) {
       const first = customerOrders[0]
@@ -77,150 +82,193 @@ export default function ViewOrderDialog({
     setNewOrder({ color: colors[0], size: "M", design: designs[0] })
   }
 
+  // 🔹 Show defective note dialog
+  const handleOpenDefectiveDialog = (orderId: number) => {
+    setSelectedOrderId(orderId)
+    setDefectiveDialogOpen(true)
+  }
+
+  // 🔹 Confirm marking defective with note
+  const handleConfirmDefective = () => {
+    if (selectedOrderId !== null && defectiveNote.trim() !== "") {
+      onMarkDefective(selectedOrderId, defectiveNote)
+      setDefectiveDialogOpen(false)
+      setDefectiveNote("")
+      setSelectedOrderId(null)
+    }
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Customer Details & Orders</DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Customer Details & Orders</DialogTitle>
+          </DialogHeader>
 
-        {/* CUSTOMER INFO */}
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label>Name</Label>
-              <Input
-                value={customer.name}
-                onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label>Facebook</Label>
-              <Input
-                value={customer.facebook}
-                onChange={(e) => setCustomer({ ...customer, facebook: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label>Phone</Label>
-              <Input
-                value={customer.phone}
-                onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
-              />
-            </div>
-            <div>
-              <Label>Chapter</Label>
-              <Input
-                value={customer.chapter}
-                onChange={(e) => setCustomer({ ...customer, chapter: e.target.value })}
-              />
-            </div>
-          </div>
-          <div>
-            <Label>Address</Label>
-            <Input
-              value={customer.address}
-              onChange={(e) => setCustomer({ ...customer, address: e.target.value })}
-            />
-          </div>
-
-          <div className="flex justify-end">
-            <Button onClick={() => onEditCustomer(customer)}>Save Customer Info</Button>
-          </div>
-        </div>
-
-        {/* ORDERS SECTION */}
-        <div className="mt-6">
-          <h3 className="font-semibold mb-2">Orders</h3>
-          <div className="space-y-3">
-            {customerOrders.map((order) => (
-              <div
-                key={order.id}
-                className="border rounded-lg p-3 flex justify-between items-center"
-              >
-                <div>
-                  <p className="font-medium">
-                    {order.color} - {order.size} - {order.design}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Order Date: {order.orderDate}
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => onMarkDefective(order.id)}
-                  >
-                    Mark Defective
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => onDeleteOrder(order.id)}
-                  >
-                    Delete
-                  </Button>
-                </div>
+          {/* CUSTOMER INFO */}
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Name</Label>
+                <Input
+                  value={customer.name}
+                  onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
+                />
               </div>
-            ))}
-          </div>
-        </div>
+              <div>
+                <Label>Facebook</Label>
+                <Input
+                  value={customer.facebook}
+                  onChange={(e) => setCustomer({ ...customer, facebook: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Phone</Label>
+                <Input
+                  value={customer.phone}
+                  onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
+                />
+              </div>
+              <div>
+                <Label>Chapter</Label>
+                <Input
+                  value={customer.chapter}
+                  onChange={(e) => setCustomer({ ...customer, chapter: e.target.value })}
+                />
+              </div>
+            </div>
+            <div>
+              <Label>Address</Label>
+              <Input
+                value={customer.address}
+                onChange={(e) => setCustomer({ ...customer, address: e.target.value })}
+              />
+            </div>
 
-        {/* ADD MORE ORDER */}
-        <div className="mt-6 border-t pt-4">
-          <h3 className="font-semibold mb-3">Add More Order</h3>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <Label>Color</Label>
-              <select
-                className="border rounded p-2 w-full"
-                value={newOrder.color}
-                onChange={(e) => setNewOrder({ ...newOrder, color: e.target.value })}
-              >
-                {colors.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <Label>Size</Label>
-              <select
-                className="border rounded p-2 w-full"
-                value={newOrder.size}
-                onChange={(e) => setNewOrder({ ...newOrder, size: e.target.value })}
-              >
-                {["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"].map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <Label>Design</Label>
-              <select
-                className="border rounded p-2 w-full"
-                value={newOrder.design}
-                onChange={(e) => setNewOrder({ ...newOrder, design: e.target.value })}
-              >
-                {designs.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </select>
+            <div className="flex justify-end">
+              <Button onClick={() => onEditCustomer(customer)}>Save Customer Info</Button>
             </div>
           </div>
-          <div className="flex justify-end mt-3">
-            <Button onClick={handleAddOrder}>
-              <Plus className="w-4 h-4 mr-2" /> Add Order
-            </Button>
+
+          {/* ORDERS SECTION */}
+          <div className="mt-6">
+            <h3 className="font-semibold mb-2">Orders</h3>
+            <div className="space-y-3">
+              {customerOrders.map((order) => (
+                <div
+                  key={order.id}
+                  className="border rounded-lg p-3 flex justify-between items-center"
+                >
+                  <div>
+                    <p className="font-medium">
+                      {order.color} - {order.size} - {order.design}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      Order Date: {order.orderDate}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenDefectiveDialog(order.id)}
+                    >
+                      Mark Defective
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => onDeleteOrder(order.id)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+
+          {/* ADD MORE ORDER */}
+          <div className="mt-6 border-t pt-4">
+            <h3 className="font-semibold mb-3">Add More Order</h3>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label>Color</Label>
+                <select
+                  className="border rounded p-2 w-full"
+                  value={newOrder.color}
+                  onChange={(e) => setNewOrder({ ...newOrder, color: e.target.value })}
+                >
+                  {colors.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label>Size</Label>
+                <select
+                  className="border rounded p-2 w-full"
+                  value={newOrder.size}
+                  onChange={(e) => setNewOrder({ ...newOrder, size: e.target.value })}
+                >
+                  {["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"].map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label>Design</Label>
+                <select
+                  className="border rounded p-2 w-full"
+                  value={newOrder.design}
+                  onChange={(e) => setNewOrder({ ...newOrder, design: e.target.value })}
+                >
+                  {designs.map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-end mt-3">
+              <Button onClick={handleAddOrder}>
+                <Plus className="w-4 h-4 mr-2" /> Add Order
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 🔹 Defective Note Dialog */}
+      <Dialog open={defectiveDialogOpen} onOpenChange={setDefectiveDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Defective Note</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Label>Note</Label>
+            <Input
+              placeholder="Enter reason or description"
+              value={defectiveNote}
+              onChange={(e) => setDefectiveNote(e.target.value)}
+            />
+            <div className="flex justify-end gap-2 mt-4">
+              <Button variant="outline" onClick={() => setDefectiveDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleConfirmDefective} disabled={!defectiveNote.trim()}>
+                Confirm
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

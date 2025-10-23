@@ -39,10 +39,13 @@ export default function TrashDialog({
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
-      <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 my-8">
+    <div className="fixed inset-0 bg-gray-200/40 backdrop-blur-sm flex items-center justify-center z-50 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-xl p-6 max-w-2xl w-full mx-4 my-8 border border-gray-100">
+        {/* Header */}
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold">Trash ({trashOrders.length})</h2>
+          <h2 className="text-xl font-bold text-gray-800">
+            Trash ({trashOrders.length})
+          </h2>
           <div className="flex gap-2">
             <Button
               onClick={onRetrieveAll}
@@ -63,18 +66,32 @@ export default function TrashDialog({
           </div>
         </div>
 
+        {/* Trash List */}
         <div className="space-y-2 max-h-96 overflow-y-auto mb-4">
           {trashOrders.length === 0 ? (
-            <div className="text-center text-gray-500 py-8">Trash is empty</div>
+            <div className="text-center text-gray-500 py-8">
+              Trash is empty
+            </div>
           ) : (
             trashOrders.map((order) => (
-              <div key={order.id} className="p-3 border border-gray-200 rounded flex justify-between items-center">
+              <div
+                key={order.id}
+                className="p-3 border border-gray-200 rounded-lg flex justify-between items-center hover:bg-gray-50 transition-colors"
+              >
                 <div className="text-sm">
-                  <div className="font-medium">{order.name}</div>
+                  <div className="font-medium text-gray-800">{order.name}</div>
                   <div className="text-gray-600">
                     {order.color} - {order.size} - {order.design}
                   </div>
+
+                  {/* If defective note exists, show it */}
+                  {order.defectiveNote && (
+                    <div className="text-xs text-red-500 mt-1 italic">
+                      Note: {order.defectiveNote}
+                    </div>
+                  )}
                 </div>
+
                 <div className="flex gap-2">
                   <Button
                     onClick={() => order.id && onRetrieveOrder(order.id)}
@@ -84,7 +101,9 @@ export default function TrashDialog({
                     Retrieve
                   </Button>
                   <Button
-                    onClick={() => order.id && onDeleteOrderPermanently(order.id)}
+                    onClick={() =>
+                      order.id && onDeleteOrderPermanently(order.id)
+                    }
                     variant="destructive"
                     size="sm"
                   >
@@ -96,7 +115,12 @@ export default function TrashDialog({
           )}
         </div>
 
-        <Button onClick={() => onOpenChange(false)} variant="outline" className="w-full">
+        {/* Close Button */}
+        <Button
+          onClick={() => onOpenChange(false)}
+          variant="outline"
+          className="w-full"
+        >
           Close
         </Button>
       </div>
