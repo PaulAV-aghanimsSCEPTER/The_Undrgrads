@@ -1,7 +1,9 @@
 "use client"
 
+import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { ChevronDown, ChevronUp } from "lucide-react"
 
 interface Order {
   id?: number
@@ -18,27 +20,38 @@ interface DesignsBreakdownDialogProps {
 }
 
 export default function DesignsBreakdownDialog({ open, onOpenChange, orders }: DesignsBreakdownDialogProps) {
-  // Group orders by color, size, and design
-  const breakdown = orders.reduce(
+  const [expandedColors, setExpandedColors] = useState<Set<string>>(new Set())
+
+  const colorGroups = orders.reduce(
     (acc, order) => {
-      const key = `${order.color}-${order.size}-${order.design}`
-      if (!acc[key]) {
-        acc[key] = { color: order.color, size: order.size, design: order.design, quantity: 0 }
+      if (!acc[order.color]) {
+        acc[order.color] = {}
       }
-      acc[key].quantity += 1
+      const sizeKey = order.size
+      if (!acc[order.color][sizeKey]) {
+        acc[order.color][sizeKey] = {}
+      }
+      if (!acc[order.color][sizeKey][order.design]) {
+        acc[order.color][sizeKey][order.design] = 0
+      }
+      acc[order.color][sizeKey][order.design] += 1
       return acc
     },
-    {} as Record<string, { color: string; size: string; design: string; quantity: number }>,
+    {} as Record<string, Record<string, Record<string, number>>>,
   )
 
-  // Sort by color, then size, then design
   const sizeOrder = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"]
-  const sorted = Object.values(breakdown).sort((a, b) => {
-    if (a.color !== b.color) return a.color.localeCompare(b.color)
-    const sizeCompare = sizeOrder.indexOf(a.size) - sizeOrder.indexOf(b.size)
-    if (sizeCompare !== 0) return sizeCompare
-    return a.design.localeCompare(b.design)
-  })
+  const sortedColors = Object.keys(colorGroups).sort()
+
+  const toggleColor = (color: string) => {
+    const newExpanded = new Set(expandedColors)
+    if (newExpanded.has(color)) {
+      newExpanded.delete(color)
+    } else {
+      newExpanded.add(color)
+    }
+    setExpandedColors(newExpanded)
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -48,20 +61,55 @@ export default function DesignsBreakdownDialog({ open, onOpenChange, orders }: D
         </DialogHeader>
         <ScrollArea className="h-96 w-full rounded-md border p-4">
           <div className="space-y-2">
-            <div className="grid grid-cols-4 gap-4 font-bold text-sm border-b pb-2 mb-2">
-              <div>COLOR</div>
-              <div>SIZE</div>
-              <div>DESIGN</div>
-              <div>QUANTITY</div>
-            </div>
-            {sorted.map((item, idx) => (
-              <div key={idx} className="grid grid-cols-4 gap-4 text-sm py-1 border-b">
-                <div>{item.color}</div>
-                <div>{item.size}</div>
-                <div>{item.design}</div>
-                <div>{item.quantity}</div>
-              </div>
-            ))}
+            {sortedColors.map((color) => {
+              const isExpanded = expandedColors.has(color)
+              const sizes = colorGroups[color]
+              const totalQuantity = Object.values(sizes).reduce(
+                (sum, sizeData) => sum + Object.values(sizeData).reduce((s, q) => s + q, 0),
+                0,
+              )
+
+              return (
+                <div key={color} className="border rounded">
+                  <button
+                    onClick={() => toggleColor(color)}
+                    className="w-full flex items-center justify-between p-3 hover:bg-gray-100 transition"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-4 h-4 rounded border" style={{ backgroundColor: color.toLowerCase() }}></div>
+                      <span className="font-semibold">{color}</span>
+                      <span className="text-sm text-gray-600">({totalQuantity} total)</span>
+                    </div>
+                    {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                  </button>
+
+                  {isExpanded && (
+                    <div className="bg-gray-50 border-t">
+                      <div className="p-3 space-y-2">
+                        {sizeOrder.map((size) => {
+                          const designs = sizes[size]
+                          if (!designs || Object.keys(designs).length === 0) return null
+
+                          return (
+                            <div key={size} className="bg-white rounded border p-2">
+                              <div className="font-medium text-sm mb-2">{size}</div>
+                              <div className="space-y-1 ml-2">
+                                {Object.entries(designs).map(([design, quantity]) => (
+                                  <div key={design} className="flex justify-between text-sm">
+                                    <span className="text-gray-700">{design}</span>
+                                    <span className="font-medium">{quantity}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </ScrollArea>
       </DialogContent>

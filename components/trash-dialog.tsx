@@ -12,6 +12,9 @@ export interface Order {
   color: string
   size: string
   design: string
+  isDefective?: boolean
+  defectiveNote?: string
+  defectiveDate?: string
 }
 
 interface TrashDialogProps {

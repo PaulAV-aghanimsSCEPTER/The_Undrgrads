@@ -291,6 +291,87 @@ export default function Home() {
           onViewOrder={handleViewOrder}
           defectiveItems={defectiveOrders}
         />
+
+        {defectiveOrders.length > 0 && (
+          <div className="mt-8 p-6 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-2xl font-bold text-red-700">Defective Items ({defectiveOrders.length})</h2>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    if (confirm("Retrieve all defective items?")) {
+                      setOrders((prev) => [...prev, ...defectiveOrders])
+                      setDefectiveOrders([])
+                    }
+                  }}
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded"
+                >
+                  Retrieve All
+                </button>
+                <button
+                  onClick={() => {
+                    if (confirm("Delete all defective items permanently?")) {
+                      setDefectiveOrders([])
+                    }
+                  }}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
+                >
+                  Delete All
+                </button>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b-2 border-red-300">
+                    <th className="text-left p-2">Customer</th>
+                    <th className="text-left p-2">Color</th>
+                    <th className="text-left p-2">Size</th>
+                    <th className="text-left p-2">Design</th>
+                    <th className="text-left p-2">Defect Note</th>
+                    <th className="text-left p-2">Date</th>
+                    <th className="text-left p-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {defectiveOrders.map((order) => (
+                    <tr key={order.id} className="border-b border-red-200 hover:bg-red-100">
+                      <td className="p-2">{order.name}</td>
+                      <td className="p-2">{order.color}</td>
+                      <td className="p-2">{order.size}</td>
+                      <td className="p-2">{order.design}</td>
+                      <td className="p-2 text-xs">{order.defectiveNote}</td>
+                      <td className="p-2 text-xs">{order.defectiveDate}</td>
+                      <td className="p-2">
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => {
+                              setOrders((prev) => [...prev, order])
+                              setDefectiveOrders((prev) => prev.filter((o) => o.id !== order.id))
+                            }}
+                            className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded"
+                          >
+                            Retrieve
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (confirm("Delete this defective item permanently?")) {
+                                setDefectiveOrders((prev) => prev.filter((o) => o.id !== order.id))
+                              }
+                            }}
+                            className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* DIALOGS */}

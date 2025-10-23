@@ -1,7 +1,9 @@
 "use client"
 
+import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { ChevronDown, ChevronUp } from "lucide-react"
 
 interface Order {
   id?: number
@@ -19,26 +21,35 @@ interface TShirtsBreakdownDialogProps {
 }
 
 export default function TShirtsBreakdownDialog({ open, onOpenChange, orders, type }: TShirtsBreakdownDialogProps) {
-  // Group orders by color and size
-  const breakdown = orders.reduce(
+  const [expandedColors, setExpandedColors] = useState<Set<string>>(new Set())
+
+  const colorGroups = orders.reduce(
     (acc, order) => {
-      const key = `${order.color}-${order.size}`
-      if (!acc[key]) {
-        acc[key] = { color: order.color, size: order.size, quantity: 0, designs: new Set() }
+      if (!acc[order.color]) {
+        acc[order.color] = {}
       }
-      acc[key].quantity += 1
-      acc[key].designs.add(order.design)
+      const sizeKey = order.size
+      if (!acc[order.color][sizeKey]) {
+        acc[order.color][sizeKey] = 0
+      }
+      acc[order.color][sizeKey] += 1
       return acc
     },
-    {} as Record<string, { color: string; size: string; quantity: number; designs: Set<string> }>,
+    {} as Record<string, Record<string, number>>,
   )
 
-  // Sort by color then by size
   const sizeOrder = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"]
-  const sorted = Object.values(breakdown).sort((a, b) => {
-    if (a.color !== b.color) return a.color.localeCompare(b.color)
-    return sizeOrder.indexOf(a.size) - sizeOrder.indexOf(b.size)
-  })
+  const sortedColors = Object.keys(colorGroups).sort()
+
+  const toggleColor = (color: string) => {
+    const newExpanded = new Set(expandedColors)
+    if (newExpanded.has(color)) {
+      newExpanded.delete(color)
+    } else {
+      newExpanded.add(color)
+    }
+    setExpandedColors(newExpanded)
+  }
 
   const title = type === "total" ? "Total T-Shirts Breakdown" : "Designs Per Size/Color"
 
@@ -50,18 +61,43 @@ export default function TShirtsBreakdownDialog({ open, onOpenChange, orders, typ
         </DialogHeader>
         <ScrollArea className="h-96 w-full rounded-md border p-4">
           <div className="space-y-2">
-            <div className="grid grid-cols-3 gap-4 font-bold text-sm border-b pb-2 mb-2">
-              <div>COLOR</div>
-              <div>SIZE</div>
-              <div>QUANTITY</div>
-            </div>
-            {sorted.map((item, idx) => (
-              <div key={idx} className="grid grid-cols-3 gap-4 text-sm py-1 border-b">
-                <div>{item.color}</div>
-                <div>{item.size}</div>
-                <div>{item.quantity}</div>
-              </div>
-            ))}
+            {sortedColors.map((color) => {
+              const isExpanded = expandedColors.has(color)
+              const sizes = colorGroups[color]
+              const totalQuantity = Object.values(sizes).reduce((sum, qty) => sum + qty, 0)
+
+              return (
+                <div key={color} className="border rounded">
+                  <button
+                    onClick={() => toggleColor(color)}
+                    className="w-full flex items-center justify-between p-3 hover:bg-gray-100 transition"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-4 h-4 rounded border" style={{ backgroundColor: color.toLowerCase() }}></div>
+                      <span className="font-semibold">{color}</span>
+                      <span className="text-sm text-gray-600">({totalQuantity} total)</span>
+                    </div>
+                    {isExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                  </button>
+
+                  {isExpanded && (
+                    <div className="bg-gray-50 border-t">
+                      <div className="grid grid-cols-2 gap-2 p-3">
+                        {sizeOrder.map((size) => {
+                          const quantity = sizes[size] || 0
+                          return quantity > 0 ? (
+                            <div key={size} className="flex justify-between text-sm p-2 bg-white rounded border">
+                              <span className="font-medium">{size}</span>
+                              <span className="text-gray-600">{quantity}</span>
+                            </div>
+                          ) : null
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </ScrollArea>
       </DialogContent>
