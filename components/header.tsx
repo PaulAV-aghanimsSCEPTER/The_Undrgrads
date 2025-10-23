@@ -15,10 +15,10 @@ export default function Header({ onAddOrder, onAddDesign, onAddColor, onDeleteAl
     <header className="bg-white border-b border-gray-200 shadow-sm">
       <div className="container mx-auto px-4 py-4">
         <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold text-gray-900">Order Management</h1>
+          <h1 className="text-2xl font-bold text-gray-900">The Undergrads</h1>
           <div className="flex gap-2">
             <Button onClick={onViewTrash} variant="outline" size="sm">
-              🗑️ Trash
+              🗑️ Trash  
             </Button>
             <Button onClick={onDeleteAll} variant="destructive" size="sm">
               Delete All Orders

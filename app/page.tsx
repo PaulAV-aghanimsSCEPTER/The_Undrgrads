@@ -189,14 +189,14 @@ export default function Home() {
         return sizeOrder.indexOf(a.size) - sizeOrder.indexOf(b.size)
       })
 
-      content = "Total Ordered Tshirts\n"
-      content += "=========================\n"
-      content += "COLOR   |     SIZES     |   QUANTITY\n"
-      content += "--------------------------------------\n"
+      content =            "Total Ordered Tshirts\n"
+      content += "=============================================\n"
+      content +=     "COLOR   |     SIZES     |   QUANTITY\n"
+      content += "----------------------------------------------\n"
       sorted.forEach((item) => {
         content += `${item.color.padEnd(7)} | ${item.size.padEnd(13)} | ${item.quantity}\n`
       })
-      content += "=========================\n"
+      content += "=============================================\n"
     } else {
       // Group by color, size, and design
       const breakdown = orders.reduce(
@@ -217,16 +217,16 @@ export default function Home() {
         const sizeCompare = sizeOrder.indexOf(a.size) - sizeOrder.indexOf(b.size)
         if (sizeCompare !== 0) return sizeCompare
         return a.design.localeCompare(b.design)
-      })
+      }) 
 
-      content = "Total Ordered Tshirts By Design\n"
-      content += "================================\n"
-      content += "COLOR   |     SIZES     |   QUANTITY     | DESIGN\n"
-      content += "-------------------------------------------------\n"
+      content =         "Total Ordered Tshirts By Design\n"
+      content += "=======================================================\n"
+      content +=    "COLOR   |     SIZES     |   QUANTITY     | DESIGN\n"
+      content += "--------------------------------------------------------\n"
       sorted.forEach((item) => {
         content += `${item.color.padEnd(7)} | ${item.size.padEnd(13)} | ${String(item.quantity).padEnd(14)} | ${item.design}\n`
       })
-      content += "=========================\n"
+      content += "========================================================\n"
     }
 
     // Create and download file
