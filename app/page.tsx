@@ -168,9 +168,10 @@ export default function Home() {
 
 const handleDownload = (type: "total" | "byDesign") => {
   let content = "";
+  const sizeOrder = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"];
 
   if (type === "total") {
-    // --- Regular Total (same as before) ---
+    // --- TOTAL ORDERED T-SHIRTS ---
     const breakdown = orders.reduce((acc, order) => {
       const key = `${order.color}-${order.size}`;
       if (!acc[key]) acc[key] = { color: order.color, size: order.size, quantity: 0 };
@@ -178,81 +179,78 @@ const handleDownload = (type: "total" | "byDesign") => {
       return acc;
     }, {} as Record<string, { color: string; size: string; quantity: number }>);
 
-    const sizeOrder = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"];
     const sorted = Object.values(breakdown).sort((a, b) => {
       if (a.color !== b.color) return a.color.localeCompare(b.color);
       return sizeOrder.indexOf(a.size) - sizeOrder.indexOf(b.size);
     });
 
-    content += "                     Total Ordered T-shirts\n";
-    content += "=================================================\n";
-    content += "|   COLOR   |  SIZE  |  QUANTITY  |\n";
-    content += "|---------------------------------|\n";
+    content += "                   TOTAL ORDERED T-SHIRTS\n\n";
+    content += "|===============================|\n";
+    content += "| COLOR   | SIZE | QUANTITY     |\n";
+    content += "|-------------------------------|\n";
 
-    let lastColor = "";
     let grandTotal = 0;
+    let lastColor = "";
 
-    sorted.forEach((item, i) => {
+    sorted.forEach((item) => {
       if (lastColor && lastColor !== item.color) {
-        content += "|---------------------------------|\n";
+        content += "|-------------------------------|\n";
       }
-
-      content += `|   ${item.color.padEnd(7)} |  ${item.size.padEnd(5)} |     ${String(item.quantity).padEnd(6)} |\n`;
+      content += `| ${item.color.padEnd(7)} | ${item.size.padEnd(4)} | ${String(item.quantity).padEnd(12)}|\n`;
       grandTotal += item.quantity;
       lastColor = item.color;
-
-      if (i < sorted.length - 1 && sorted[i + 1].color !== item.color) {
-        content += "|---------------------------------|\n";
-      }
     });
 
-    content += "|---------------------------------|\n";
-    content += `|            GRAND TOTAL : ${String(grandTotal).padEnd(6)}     |\n`;
-    content += "=================================================\n";
+    content += "|===============================|\n";
+    content += `| OVERALL TOTAL: ${String(grandTotal).padEnd(12)} |\n`;
+    content += "|===============================|\n";
   } 
   else {
-    // --- By Design (NEW FORMAT) ---
+    // --- TOTAL ORDERED T-SHIRTS BY DESIGN (with spaces between designs & color separators) ---
     const breakdown = orders.reduce((acc, order) => {
       const key = `${order.design}-${order.color}-${order.size}`;
-      if (!acc[key]) acc[key] = { design: order.design, color: order.color, size: order.size, quantity: 0 };
+      if (!acc[key])
+        acc[key] = { design: order.design, color: order.color, size: order.size, quantity: 0 };
       acc[key].quantity += 1;
       return acc;
     }, {} as Record<string, { design: string; color: string; size: string; quantity: number }>);
 
-    const sizeOrder = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"];
     const sorted = Object.values(breakdown).sort((a, b) => {
       if (a.design !== b.design) return a.design.localeCompare(b.design);
       if (a.color !== b.color) return a.color.localeCompare(b.color);
       return sizeOrder.indexOf(a.size) - sizeOrder.indexOf(b.size);
     });
 
-    content += "                      Total Ordered T-shirts\n\n";
+    content += "                     TOTAL ORDERED T-SHIRTS BY DESIGN\n\n";
 
     let currentDesign = "";
     let grandTotal = 0;
+    let lastColor = "";
 
-    sorted.forEach((item, i) => {
+    sorted.forEach((item, i, arr) => {
       if (currentDesign !== item.design) {
-        // New design section header
-        content += `                         ★ ${item.design} ★\n`;
-        content += "|================================================|\n";
-        content += "|   COLOR   |  SIZE  |  QUANTITY  |\n";
-        content += "|------------------------------------------------|\n";
+        if (currentDesign) content += "\n"; // Add space between designs
+        content += `  ${item.design.toUpperCase()}\n`;
+        content += "|===============================|\n";
+        content += "| COLOR   | SIZE | QUANTITY     |\n";
+        content += "|-------------------------------|\n";
+        lastColor = "";
       }
 
-      content += `|   ${item.color.padEnd(7)} |  ${item.size.padEnd(5)} |     ${String(item.quantity).padEnd(6)} |\n`;
+      if (lastColor && lastColor !== item.color) {
+        content += "|-------------------------------|\n";
+      }
+
+      content += `| ${item.color.padEnd(7)} | ${item.size.padEnd(4)} | ${String(item.quantity).padEnd(12)}|\n`;
+
       grandTotal += item.quantity;
+      lastColor = item.color;
       currentDesign = item.design;
-
-      const next = sorted[i + 1];
-      if (!next || next.design !== currentDesign) {
-        content += "|================================================|\n\n";
-      }
     });
 
-    content += "|===============================================|\n";
-    content += `|           OVERALL TOTAL : ${String(grandTotal).padEnd(6)}         |\n`;
-    content += "|===============================================|\n";
+    content += "|===============================|\n";
+    content += `| OVERALL TOTAL: ${String(grandTotal).padEnd(12)} |\n`;
+    content += "|===============================|\n";
   }
 
   const element = document.createElement("a");
@@ -262,6 +260,10 @@ const handleDownload = (type: "total" | "byDesign") => {
   element.click();
   document.body.removeChild(element);
 };
+
+
+
+
 
 
 
