@@ -1,29 +1,25 @@
 "use client"
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 
 export interface Order {
-  id: number
+  id?: number
   name: string
-  facebook: string
-  phone: string
-  chapter: string
+  phone?: string
+  facebook?: string
+  chapter?: string
   address?: string
-  orderDate: string
   color: string
   size: string
   design: string
-  isDefective?: boolean
-  defectiveNote?: string
 }
 
 interface TrashDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   trashOrders: Order[]
-  onRetrieveOrder: (id: number) => void
-  onDeleteOrderPermanently: (id: number) => void
+  onRetrieveOrder: (orderId: number) => void
+  onDeleteOrderPermanently: (orderId: number) => void
   onRetrieveAll: () => void
   onDeleteAllPermanently: () => void
 }
@@ -37,68 +33,70 @@ export default function TrashDialog({
   onRetrieveAll,
   onDeleteAllPermanently,
 }: TrashDialogProps) {
+  if (!open) return null
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Trash Bin</DialogTitle>
-        </DialogHeader>
-
-        <div className="space-y-2 max-h-80 overflow-y-auto mt-4">
-          {trashOrders.length === 0 && <p>No deleted orders.</p>}
-          {trashOrders.map((order) => (
-            <div
-              key={order.id}
-              className="flex justify-between items-center border p-2 rounded"
-            >
-              <span>
-                {order.name} - {order.design} - {order.color} - {order.size}
-              </span>
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => {
-                    if (confirm("Retrieve this order?")) onRetrieveOrder(order.id)
-                  }}
-                  className="bg-green-500 hover:bg-green-600 text-white px-2 py-1 rounded"
-                  size="sm"
-                >
-                  Retrieve
-                </Button>
-                <Button
-                  onClick={() => {
-                    if (confirm("Delete permanently?")) onDeleteOrderPermanently(order.id)
-                  }}
-                  className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded"
-                  size="sm"
-                >
-                  Delete
-                </Button>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {trashOrders.length > 0 && (
-          <DialogFooter className="mt-4 flex justify-end gap-2">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto">
+      <div className="bg-white rounded-lg p-6 max-w-2xl w-full mx-4 my-8">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl font-bold">Trash ({trashOrders.length})</h2>
+          <div className="flex gap-2">
             <Button
-              onClick={() => {
-                if (confirm("Retrieve ALL orders?")) onRetrieveAll()
-              }}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
+              onClick={onRetrieveAll}
+              disabled={trashOrders.length === 0}
+              className="bg-green-600 hover:bg-green-700"
+              size="sm"
             >
               Retrieve All
             </Button>
             <Button
-              onClick={() => {
-                if (confirm("Delete ALL permanently?")) onDeleteAllPermanently()
-              }}
-              className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded"
+              onClick={onDeleteAllPermanently}
+              disabled={trashOrders.length === 0}
+              variant="destructive"
+              size="sm"
             >
               Delete All
             </Button>
-          </DialogFooter>
-        )}
-      </DialogContent>
-    </Dialog>
+          </div>
+        </div>
+
+        <div className="space-y-2 max-h-96 overflow-y-auto mb-4">
+          {trashOrders.length === 0 ? (
+            <div className="text-center text-gray-500 py-8">Trash is empty</div>
+          ) : (
+            trashOrders.map((order) => (
+              <div key={order.id} className="p-3 border border-gray-200 rounded flex justify-between items-center">
+                <div className="text-sm">
+                  <div className="font-medium">{order.name}</div>
+                  <div className="text-gray-600">
+                    {order.color} - {order.size} - {order.design}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={() => order.id && onRetrieveOrder(order.id)}
+                    className="bg-green-600 hover:bg-green-700"
+                    size="sm"
+                  >
+                    Retrieve
+                  </Button>
+                  <Button
+                    onClick={() => order.id && onDeleteOrderPermanently(order.id)}
+                    variant="destructive"
+                    size="sm"
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <Button onClick={() => onOpenChange(false)} variant="outline" className="w-full">
+          Close
+        </Button>
+      </div>
+    </div>
   )
 }

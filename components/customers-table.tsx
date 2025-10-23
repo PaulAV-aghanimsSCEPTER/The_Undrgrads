@@ -1,23 +1,22 @@
 "use client"
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+
+interface Order {
+  id?: number
+  name: string
+  color: string
+  size: string
+  design: string
+}
 
 interface Customer {
   name: string
   facebook: string
   phone: string
   chapter: string
-  orders: any[]
-}
-
-interface DefectiveItem {
-  id: number
-  name: string
-  color: string
-  size: string
-  design: string
+  address: string
+  orders: Order[]
 }
 
 interface CustomersTableProps {
@@ -27,7 +26,7 @@ interface CustomersTableProps {
   totalItems: number
   onPageChange: (page: number) => void
   onViewOrder: (customerName: string) => void
-  defectiveItems: DefectiveItem[]
+  defectiveItems: any[]
 }
 
 export default function CustomersTable({
@@ -37,125 +36,85 @@ export default function CustomersTable({
   totalItems,
   onPageChange,
   onViewOrder,
-  defectiveItems,
 }: CustomersTableProps) {
-  const startItem = (currentPage - 1) * 10 + 1
-  const endItem = Math.min(currentPage * 10, totalItems)
-
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Customers</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-muted-foreground">NAME</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-muted-foreground">FACEBOOK</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-muted-foreground">PHONE</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-muted-foreground">CHAPTER</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-muted-foreground">ORDERS</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-muted-foreground">ACTION</th>
+    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-gray-100 border-b border-gray-200">
+            <tr>
+              <th className="px-4 py-3 text-left text-sm font-semibold">Customer</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold">Phone</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold">Facebook</th>
+              <th className="px-4 py-3 text-left text-sm font-semibold">Orders</th>
+              <th className="px-4 py-3 text-center text-sm font-semibold">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {customers.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                  No customers found
+                </td>
+              </tr>
+            ) : (
+              customers.map((customer) => (
+                <tr key={customer.name} className="border-b border-gray-200 hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <div className="font-medium">{customer.name}</div>
+                    <div className="text-sm text-gray-500">{customer.chapter}</div>
+                  </td>
+                  <td className="px-4 py-3 text-sm">{customer.phone}</td>
+                  <td className="px-4 py-3 text-sm">{customer.facebook}</td>
+                  <td className="px-4 py-3 text-sm font-medium">{customer.orders.length}</td>
+                  <td className="px-4 py-3 text-center">
+                    <Button onClick={() => onViewOrder(customer.name)} size="sm" variant="outline">
+                      View Orders
+                    </Button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {customers.map((customer) => (
-                  <tr key={customer.name} className="border-b hover:bg-muted/50">
-                    <td className="px-4 py-3 text-sm">{customer.name}</td>
-                    <td className="px-4 py-3 text-sm">
-                      <a
-                        href={`https://${customer.facebook}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:text-blue-700 hover:underline"
-                      >
-                        {customer.facebook}
-                      </a>
-                    </td>
-                    <td className="px-4 py-3 text-sm">{customer.phone}</td>
-                    <td className="px-4 py-3 text-sm">{customer.chapter}</td>
-                    <td className="px-4 py-3 text-sm">{customer.orders.length}</td>
-                    <td className="px-4 py-3 text-sm">
-                      <Button
-                        variant="link"
-                        className="p-0 text-blue-600 hover:text-blue-700"
-                        onClick={() => onViewOrder(customer.name)}
-                      >
-                        View
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
 
-          <div className="mt-4 flex items-center justify-between">
-            <p className="text-sm text-muted-foreground">
-              Showing {startItem} to {endItem} of {totalItems} entries
-            </p>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => onPageChange(currentPage - 1)} disabled={currentPage === 1}>
-                <ChevronLeft className="h-4 w-4" />
-                Previous
-              </Button>
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                <Button
-                  key={page}
-                  variant={currentPage === page ? "default" : "outline"}
-                  onClick={() => onPageChange(page)}
-                  className={currentPage === page ? "bg-blue-600 hover:bg-blue-700" : "border-gray-300"}
-                >
-                  {page}
-                </Button>
-              ))}
+      <div className="px-4 py-3 border-t border-gray-200 flex justify-between items-center">
+        <div className="text-sm text-gray-600">
+          Showing {customers.length > 0 ? (currentPage - 1) * 10 + 1 : 0} to {Math.min(currentPage * 10, totalItems)} of{" "}
+          {totalItems} customers
+        </div>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage === 1}
+            variant="outline"
+            size="sm"
+          >
+            Previous
+          </Button>
+          <div className="flex items-center gap-2">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
               <Button
-                variant="outline"
-                onClick={() => onPageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
+                key={page}
+                onClick={() => onPageChange(page)}
+                variant={page === currentPage ? "default" : "outline"}
+                size="sm"
               >
-                Next
-                <ChevronRight className="h-4 w-4" />
+                {page}
               </Button>
-            </div>
+            ))}
           </div>
-        </CardContent>
-      </Card>
-
-      {defectiveItems.length > 0 && (
-        <Card className="border-red-200 bg-red-50">
-          <CardHeader>
-            <CardTitle className="text-red-700">Defective Items ({defectiveItems.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-red-700">CUSTOMER</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-red-700">COLOR</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-red-700">SIZE</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold text-red-700">DESIGN</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {defectiveItems.map((item) => (
-                    <tr key={item.id} className="border-b">
-                      <td className="px-4 py-3 text-sm">{item.name}</td>
-                      <td className="px-4 py-3 text-sm">{item.color}</td>
-                      <td className="px-4 py-3 text-sm">{item.size}</td>
-                      <td className="px-4 py-3 text-sm">{item.design}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          <Button
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage === totalPages}
+            variant="outline"
+            size="sm"
+          >
+            Next
+          </Button>
+        </div>
+      </div>
     </div>
   )
 }

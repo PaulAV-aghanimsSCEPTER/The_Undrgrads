@@ -1,16 +1,7 @@
 "use client"
 
-import React from "react"
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 
 interface FilterSectionProps {
   filterName: string
@@ -44,88 +35,80 @@ export default function FilterSection({
   onFilter,
 }: FilterSectionProps) {
   return (
-    <Card className="mb-8">
-      <CardHeader>
-        <CardTitle>Filter</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid gap-4 md:grid-cols-4">
-          {/* Name Filter */}
-          <div>
-            <label className="mb-2 block text-sm font-medium">Name</label>
-            <Input
-              placeholder="Search..."
-              value={filterName}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setFilterName(e.target.value)
-              }
-            />
-          </div>
-
-          {/* Color Filter */}
-          <div>
-            <label className="mb-2 block text-sm font-medium">Color</label>
-            <Select value={filterColor} onValueChange={setFilterColor}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All</SelectItem>
-                {colors.map((color) => (
-                  <SelectItem key={color} value={color}>
-                    {color}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Size Filter */}
-          <div>
-            <label className="mb-2 block text-sm font-medium">Size</label>
-            <Select value={filterSize} onValueChange={setFilterSize}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All</SelectItem>
-                {sizes.map((size) => (
-                  <SelectItem key={size} value={size}>
-                    {size}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Design Filter */}
-          <div>
-            <label className="mb-2 block text-sm font-medium">Design</label>
-            <Select value={filterDesign} onValueChange={setFilterDesign}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All</SelectItem>
-                {designs.map((design) => (
-                  <SelectItem key={design} value={design}>
-                    {design}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+    <div className="bg-white p-4 rounded-lg border border-gray-200 mb-6">
+      <h2 className="text-lg font-semibold mb-4">Filters</h2>
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">Customer Name</label>
+          <Input
+            placeholder="Search customer..."
+            value={filterName}
+            onChange={(e) => {
+              setFilterName(e.target.value)
+              onFilter()
+            }}
+          />
         </div>
-
-        <div className="mt-4 flex justify-end gap-2">
-          <Button variant="outline" onClick={onReset}>
-            Reset
-          </Button>
-          <Button onClick={onFilter} className="bg-blue-600 hover:bg-blue-700">
-            Filter
+        <div>
+          <label className="block text-sm font-medium mb-1">Color</label>
+          <select
+            value={filterColor}
+            onChange={(e) => {
+              setFilterColor(e.target.value)
+              onFilter()
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+          >
+            <option>All</option>
+            {colors.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Size</label>
+          <select
+            value={filterSize}
+            onChange={(e) => {
+              setFilterSize(e.target.value)
+              onFilter()
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+          >
+            <option>All</option>
+            {sizes.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Design</label>
+          <select
+            value={filterDesign}
+            onChange={(e) => {
+              setFilterDesign(e.target.value)
+              onFilter()
+            }}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+          >
+            <option>All</option>
+            {designs.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-end">
+          <Button onClick={onReset} variant="outline" className="w-full bg-transparent">
+            Reset Filters
           </Button>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
