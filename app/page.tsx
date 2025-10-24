@@ -32,7 +32,7 @@ export default function Home() {
   const [showAddColorDialog, setShowAddColorDialog] = useState(false)
   const [showViewOrderDialog, setShowViewOrderDialog] = useState(false)
   const [showTrashDialog, setShowTrashDialog] = useState(false)
-  const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null)
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
   const [showTShirtsBreakdown, setShowTShirtsBreakdown] = useState(false)
   const [showDesignsBreakdown, setShowDesignsBreakdown] = useState(false)
 
@@ -120,12 +120,16 @@ export default function Home() {
     setShowAddOrderDialog(false)
   }
 
-  const handleAddMoreOrder = (order: any) => {
-    setOrders((prev) => {
-      const id = nextId()
-      return [...prev, { ...order, id, isDefective: false }]
-    })
-  }
+const handleAddMoreOrder = (newOrder: Order) => {
+  setOrders((prev) => {
+    // Generate new unique ID
+    const id = nextId()
+    const orderWithId = { ...newOrder, id, isDefective: false }
+    return [...prev, orderWithId]
+  })
+}
+
+
 
   const handleDeleteOrder = (orderId: number) => {
     if (confirm("Are you sure you want to delete this order?")) {
@@ -150,11 +154,16 @@ export default function Home() {
     setFilterDesign("All")
     setCurrentPage(1)
   }
-
-  const handleViewOrder = (customerName: string) => {
-    setSelectedCustomer(customerName)
-    setShowViewOrderDialog(true)
+const handleViewOrder = (customerName: string) => {
+  const customer = {
+    name: customerName,
+    ...orders.find((o) => o.name === customerName),
+    orders: orders.filter((o) => o.name === customerName),
   }
+  setSelectedCustomer(customer)
+  setShowViewOrderDialog(true)
+}
+
 
   const handleMarkDefective = (orderId: number, note?: string) => {
     const found = orders.find((o) => o.id === orderId)
@@ -183,7 +192,6 @@ export default function Home() {
     let content = ""
 
     if (type === "total") {
-      // Group by color and size
       const breakdown = orders.reduce(
         (acc, order) => {
           const key = `${order.color}-${order.size}`
@@ -202,44 +210,73 @@ export default function Home() {
         return sizeOrder.indexOf(a.size) - sizeOrder.indexOf(b.size)
       })
 
-      content = "Total Ordered Tshirts\n"
-      content += "=========================\n"
-      content += "COLOR   |     SIZES     |   QUANTITY\n"
-      content += "--------------------------------------\n"
+      const totalQuantity = sorted.reduce((sum, item) => sum + item.quantity, 0)
+
+      content = "╔════════════════════════════════════════════════════════════════╗\n"
+      content += "║                    THE UNDERGRADS                             ║\n"
+      content += "║                  Total Ordered T-Shirts                       ║\n"
+      content += "╚════════════════════════════════════════════════════════════════╝\n\n"
+      content += "═════════════════════════════════════════════════════════════════\n"
+      content += "COLOR        │    SIZE      │   QUANTITY   │    TOTAL\n"
+      content += "─────────────────────────────────────────────────────────────────\n"
+
+      let currentColor = ""
       sorted.forEach((item) => {
-        content += `${item.color.padEnd(7)} | ${item.size.padEnd(13)} | ${item.quantity}\n`
+        if (item.color !== currentColor) {
+          if (currentColor !== "") {
+            content += "═════════════════════════════════════════════════════════════════\n\n"
+          }
+          currentColor = item.color
+        }
+        content += `${item.color.padEnd(12)} │ ${item.size.padEnd(12)} │ ${String(item.quantity).padEnd(12)} │ ${item.quantity}\n`
       })
-      content += "=========================\n"
+
+      content += "═════════════════════════════════════════════════════════════════\n"
+      content += `\n                    TOTAL = ${totalQuantity}\n\n`
     } else {
-      // Group by color, size, and design
       const breakdown = orders.reduce(
         (acc, order) => {
-          const key = `${order.color}-${order.size}-${order.design}`
+          const key = `${order.design}-${order.color}-${order.size}`
           if (!acc[key]) {
-            acc[key] = { color: order.color, size: order.size, design: order.design, quantity: 0 }
+            acc[key] = { design: order.design, color: order.color, size: order.size, quantity: 0 }
           }
           acc[key].quantity += 1
           return acc
         },
-        {} as Record<string, { color: string; size: string; design: string; quantity: number }>,
+        {} as Record<string, { design: string; color: string; size: string; quantity: number }>,
       )
 
       const sizeOrder = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"]
       const sorted = Object.values(breakdown).sort((a, b) => {
+        if (a.design !== b.design) return a.design.localeCompare(b.design)
         if (a.color !== b.color) return a.color.localeCompare(b.color)
-        const sizeCompare = sizeOrder.indexOf(a.size) - sizeOrder.indexOf(b.size)
-        if (sizeCompare !== 0) return sizeCompare
-        return a.design.localeCompare(b.design)
+        return sizeOrder.indexOf(a.size) - sizeOrder.indexOf(b.size)
       })
 
-      content = "Total Ordered Tshirts By Design\n"
-      content += "================================\n"
-      content += "COLOR   |     SIZES     |   QUANTITY     | DESIGN\n"
-      content += "-------------------------------------------------\n"
+      const totalQuantity = sorted.reduce((sum, item) => sum + item.quantity, 0)
+
+      content = "╔════════════════════════════════════════════════════════════════╗\n"
+      content += "║                    THE UNDERGRADS                             ║\n"
+      content += "║            Ordered T-Shirts With Design                       ║\n"
+      content += "╚════════════════════════════════════════════════════════════════╝\n\n"
+
+      let currentDesign = ""
       sorted.forEach((item) => {
-        content += `${item.color.padEnd(7)} | ${item.size.padEnd(13)} | ${String(item.quantity).padEnd(14)} | ${item.design}\n`
+        if (item.design !== currentDesign) {
+          if (currentDesign !== "") {
+            content += "═════════════════════════════════════════════════════════════════\n\n"
+          }
+          currentDesign = item.design
+          content += `\n${item.design}\n`
+          content += "═════════════════════════════════════════════════════════════════\n"
+          content += "COLOR        │    SIZE      │   QUANTITY   │    TOTAL\n"
+          content += "─────────────────────────────────────────────────────────────────\n"
+        }
+        content += `${item.color.padEnd(12)} │ ${item.size.padEnd(12)} │ ${String(item.quantity).padEnd(12)} │ ${item.quantity}\n`
       })
-      content += "=========================\n"
+
+      content += "═════════════════════════════════════════════════════════════════\n"
+      content += `\n                    TOTAL = ${totalQuantity}\n\n`
     }
 
     // Create and download file
@@ -409,21 +446,24 @@ export default function Home() {
         onDeleteColor={(c) => setColors((p) => p.filter((x) => x !== c))}
         existingColors={colors}
       />
-      <ViewOrderDialog
-        open={showViewOrderDialog}
-        onOpenChange={setShowViewOrderDialog}
-        customerName={selectedCustomer}
-        customerOrders={selectedCustomer ? orders.filter((o) => o.name === selectedCustomer) : []}
-        colors={colors}
-        designs={designs}
-        onAddMoreOrder={handleAddMoreOrder}
-        onDeleteOrder={handleDeleteOrder}
-        onEditOrder={(order) => {
-          setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, ...order } : o)))
-        }}
-        onMarkDefective={handleMarkDefective}
-        onEditCustomer={handleEditCustomer}
-      />
+     {selectedCustomer && (
+  <ViewOrderDialog
+    open={showViewOrderDialog}
+    onOpenChange={setShowViewOrderDialog}
+    customerName={selectedCustomer.name}
+    customerOrders={orders.filter((o) => o.name === selectedCustomer?.name)}
+
+    colors={colors}
+    designs={designs}
+    onAddMoreOrder={handleAddMoreOrder}
+    onDeleteOrder={handleDeleteOrder}
+    onEditOrder={(order) => {
+      setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, ...order } : o)))
+    }}
+    onMarkDefective={handleMarkDefective}
+    onEditCustomer={handleEditCustomer}
+  />
+)}
 
       {/* TRASH DIALOG */}
       <TrashDialog
