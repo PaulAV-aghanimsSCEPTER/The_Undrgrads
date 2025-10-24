@@ -35,29 +35,30 @@ export default function FilterSection({
   onFilter,
 }: FilterSectionProps) {
   return (
-    <div className="bg-white p-4 rounded-lg border border-gray-200 mb-6">
-      <h2 className="text-lg font-semibold mb-4">Filters</h2>
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+    <div className="bg-white p-3 sm:p-4 rounded-lg border border-gray-200 mb-6">
+      <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Filters</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-4">
         <div>
-          <label className="block text-sm font-medium mb-1">Customer Name</label>
+          <label className="block text-xs sm:text-sm font-medium mb-1">Customer Name</label>
           <Input
-            placeholder="Search customer..."
+            placeholder="Search..."
             value={filterName}
             onChange={(e) => {
               setFilterName(e.target.value)
               onFilter()
             }}
+            className="text-xs sm:text-sm"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Color</label>
+          <label className="block text-xs sm:text-sm font-medium mb-1">Color</label>
           <select
             value={filterColor}
             onChange={(e) => {
               setFilterColor(e.target.value)
               onFilter()
             }}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            className="w-full px-2 sm:px-3 py-2 border border-gray-300 rounded-md text-xs sm:text-sm"
           >
             <option>All</option>
             {colors.map((c) => (
@@ -68,14 +69,14 @@ export default function FilterSection({
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Size</label>
+          <label className="block text-xs sm:text-sm font-medium mb-1">Size</label>
           <select
             value={filterSize}
             onChange={(e) => {
               setFilterSize(e.target.value)
               onFilter()
             }}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            className="w-full px-2 sm:px-3 py-2 border border-gray-300 rounded-md text-xs sm:text-sm"
           >
             <option>All</option>
             {sizes.map((s) => (
@@ -86,14 +87,14 @@ export default function FilterSection({
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Design</label>
+          <label className="block text-xs sm:text-sm font-medium mb-1">Design</label>
           <select
             value={filterDesign}
             onChange={(e) => {
               setFilterDesign(e.target.value)
               onFilter()
             }}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
+            className="w-full px-2 sm:px-3 py-2 border border-gray-300 rounded-md text-xs sm:text-sm"
           >
             <option>All</option>
             {designs.map((d) => (
@@ -104,8 +105,8 @@ export default function FilterSection({
           </select>
         </div>
         <div className="flex items-end">
-          <Button onClick={onReset} variant="outline" className="w-full bg-transparent">
-            Reset Filters
+          <Button onClick={onReset} variant="outline" className="w-full bg-transparent text-xs sm:text-sm">
+            Reset
           </Button>
         </div>
       </div>

@@ -42,9 +42,14 @@ export default function Home() {
     const savedOrders = localStorage.getItem("orders")
     const savedTrash = localStorage.getItem("trashOrders")
     const savedDefective = localStorage.getItem("defectiveOrders")
+    const savedColors = localStorage.getItem("colors")
+    const savedDesigns = localStorage.getItem("designs")
+
     if (savedOrders) setOrders(JSON.parse(savedOrders))
     if (savedTrash) setTrashOrders(JSON.parse(savedTrash))
     if (savedDefective) setDefectiveOrders(JSON.parse(savedDefective))
+    if (savedColors) setColors(JSON.parse(savedColors))
+    if (savedDesigns) setDesigns(JSON.parse(savedDesigns))
   }, [])
 
   useEffect(() => {
@@ -58,6 +63,14 @@ export default function Home() {
   useEffect(() => {
     localStorage.setItem("defectiveOrders", JSON.stringify(defectiveOrders))
   }, [defectiveOrders])
+
+  useEffect(() => {
+    localStorage.setItem("colors", JSON.stringify(colors))
+  }, [colors])
+
+  useEffect(() => {
+    localStorage.setItem("designs", JSON.stringify(designs))
+  }, [designs])
 
   const uniqueCustomers = Array.from(new Set(orders.map((o) => o.name))).map((name) => {
     const customer = orders.find((o) => o.name === name)
@@ -166,110 +179,78 @@ export default function Home() {
     setSelectedCustomer(updatedCustomer.name || selectedCustomer)
   }
 
-const handleDownload = (type: "total" | "byDesign") => {
-  let content = "";
-  const sizeOrder = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"];
+  const handleDownload = (type: "total" | "byDesign") => {
+    let content = ""
 
-  if (type === "total") {
-    // --- TOTAL ORDERED T-SHIRTS ---
-    const breakdown = orders.reduce((acc, order) => {
-      const key = `${order.color}-${order.size}`;
-      if (!acc[key]) acc[key] = { color: order.color, size: order.size, quantity: 0 };
-      acc[key].quantity += 1;
-      return acc;
-    }, {} as Record<string, { color: string; size: string; quantity: number }>);
+    if (type === "total") {
+      // Group by color and size
+      const breakdown = orders.reduce(
+        (acc, order) => {
+          const key = `${order.color}-${order.size}`
+          if (!acc[key]) {
+            acc[key] = { color: order.color, size: order.size, quantity: 0 }
+          }
+          acc[key].quantity += 1
+          return acc
+        },
+        {} as Record<string, { color: string; size: string; quantity: number }>,
+      )
 
-    const sorted = Object.values(breakdown).sort((a, b) => {
-      if (a.color !== b.color) return a.color.localeCompare(b.color);
-      return sizeOrder.indexOf(a.size) - sizeOrder.indexOf(b.size);
-    });
+      const sizeOrder = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"]
+      const sorted = Object.values(breakdown).sort((a, b) => {
+        if (a.color !== b.color) return a.color.localeCompare(b.color)
+        return sizeOrder.indexOf(a.size) - sizeOrder.indexOf(b.size)
+      })
 
-    content += "                   TOTAL ORDERED T-SHIRTS\n\n";
-    content += "|===============================|\n";
-    content += "| COLOR   | SIZE | QUANTITY     |\n";
-    content += "|-------------------------------|\n";
+      content = "Total Ordered Tshirts\n"
+      content += "=========================\n"
+      content += "COLOR   |     SIZES     |   QUANTITY\n"
+      content += "--------------------------------------\n"
+      sorted.forEach((item) => {
+        content += `${item.color.padEnd(7)} | ${item.size.padEnd(13)} | ${item.quantity}\n`
+      })
+      content += "=========================\n"
+    } else {
+      // Group by color, size, and design
+      const breakdown = orders.reduce(
+        (acc, order) => {
+          const key = `${order.color}-${order.size}-${order.design}`
+          if (!acc[key]) {
+            acc[key] = { color: order.color, size: order.size, design: order.design, quantity: 0 }
+          }
+          acc[key].quantity += 1
+          return acc
+        },
+        {} as Record<string, { color: string; size: string; design: string; quantity: number }>,
+      )
 
-    let grandTotal = 0;
-    let lastColor = "";
+      const sizeOrder = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"]
+      const sorted = Object.values(breakdown).sort((a, b) => {
+        if (a.color !== b.color) return a.color.localeCompare(b.color)
+        const sizeCompare = sizeOrder.indexOf(a.size) - sizeOrder.indexOf(b.size)
+        if (sizeCompare !== 0) return sizeCompare
+        return a.design.localeCompare(b.design)
+      })
 
-    sorted.forEach((item) => {
-      if (lastColor && lastColor !== item.color) {
-        content += "|-------------------------------|\n";
-      }
-      content += `| ${item.color.padEnd(7)} | ${item.size.padEnd(4)} | ${String(item.quantity).padEnd(12)}|\n`;
-      grandTotal += item.quantity;
-      lastColor = item.color;
-    });
+      content = "Total Ordered Tshirts By Design\n"
+      content += "================================\n"
+      content += "COLOR   |     SIZES     |   QUANTITY     | DESIGN\n"
+      content += "-------------------------------------------------\n"
+      sorted.forEach((item) => {
+        content += `${item.color.padEnd(7)} | ${item.size.padEnd(13)} | ${String(item.quantity).padEnd(14)} | ${item.design}\n`
+      })
+      content += "=========================\n"
+    }
 
-    content += "|===============================|\n";
-    content += `| OVERALL TOTAL: ${String(grandTotal).padEnd(12)} |\n`;
-    content += "|===============================|\n";
-  } 
-  else {
-    // --- TOTAL ORDERED T-SHIRTS BY DESIGN (with spaces between designs & color separators) ---
-    const breakdown = orders.reduce((acc, order) => {
-      const key = `${order.design}-${order.color}-${order.size}`;
-      if (!acc[key])
-        acc[key] = { design: order.design, color: order.color, size: order.size, quantity: 0 };
-      acc[key].quantity += 1;
-      return acc;
-    }, {} as Record<string, { design: string; color: string; size: string; quantity: number }>);
-
-    const sorted = Object.values(breakdown).sort((a, b) => {
-      if (a.design !== b.design) return a.design.localeCompare(b.design);
-      if (a.color !== b.color) return a.color.localeCompare(b.color);
-      return sizeOrder.indexOf(a.size) - sizeOrder.indexOf(b.size);
-    });
-
-    content += "                     TOTAL ORDERED T-SHIRTS BY DESIGN\n\n";
-
-    let currentDesign = "";
-    let grandTotal = 0;
-    let lastColor = "";
-
-    sorted.forEach((item, i, arr) => {
-      if (currentDesign !== item.design) {
-        if (currentDesign) content += "\n"; // Add space between designs
-        content += `  ${item.design.toUpperCase()}\n`;
-        content += "|===============================|\n";
-        content += "| COLOR   | SIZE | QUANTITY     |\n";
-        content += "|-------------------------------|\n";
-        lastColor = "";
-      }
-
-      if (lastColor && lastColor !== item.color) {
-        content += "|-------------------------------|\n";
-      }
-
-      content += `| ${item.color.padEnd(7)} | ${item.size.padEnd(4)} | ${String(item.quantity).padEnd(12)}|\n`;
-
-      grandTotal += item.quantity;
-      lastColor = item.color;
-      currentDesign = item.design;
-    });
-
-    content += "|===============================|\n";
-    content += `| OVERALL TOTAL: ${String(grandTotal).padEnd(12)} |\n`;
-    content += "|===============================|\n";
+    // Create and download file
+    const element = document.createElement("a")
+    element.setAttribute("href", "data:text/plain;charset=utf-8," + encodeURIComponent(content))
+    element.setAttribute("download", type === "total" ? "tshirts-total.txt" : "tshirts-by-design.txt")
+    element.style.display = "none"
+    document.body.appendChild(element)
+    element.click()
+    document.body.removeChild(element)
   }
-
-  const element = document.createElement("a");
-  element.setAttribute("href", "data:text/plain;charset=utf-8," + encodeURIComponent(content));
-  element.setAttribute("download", type === "total" ? "tshirts-total.txt" : "tshirts-by-design.txt");
-  document.body.appendChild(element);
-  element.click();
-  document.body.removeChild(element);
-};
-
-
-
-
-
-
-
-
-
-
 
   const handleSummaryCardClick = (type: "total" | "designs") => {
     if (type === "total") {
