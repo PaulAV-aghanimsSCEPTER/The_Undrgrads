@@ -16,12 +16,11 @@ interface SummaryCardsProps {
   totalTShirts: number
   orders: Order[]
   onCardClick?: (type: "total" | "designs") => void
-  onDownload?: (type: "total" | "byDesign") => void
+  onDownload?: (type: "total" | "byDesign" | "orders") => void // ✅ added "orders"
 }
 
 export default function SummaryCards({ totalTShirts, orders, onCardClick, onDownload }: SummaryCardsProps) {
   const designsPerSizeColor = new Set(orders.map((o) => `${o.color}-${o.size}`)).size
-
   const cardClass = "p-3 sm:p-4 cursor-pointer transition-all hover:shadow-lg hover:scale-105"
 
   return (
@@ -42,6 +41,7 @@ export default function SummaryCards({ totalTShirts, orders, onCardClick, onDown
         <div className="text-2xl sm:text-3xl font-bold text-green-600">{designsPerSizeColor}</div>
       </Card>
 
+      {/* Export Buttons */}
       <Card className="p-3 sm:p-4 bg-gradient-to-br from-indigo-50 to-purple-50 border-indigo-200 hover:shadow-lg transition-all">
         <div className="text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">Export Data</div>
         <div className="flex flex-col gap-1 sm:gap-2">
@@ -54,6 +54,7 @@ export default function SummaryCards({ totalTShirts, orders, onCardClick, onDown
             <Download className="w-3 h-3 sm:w-4 sm:h-4" />
             <span className="text-xs">Total T-Shirts</span>
           </Button>
+
           <Button
             size="sm"
             variant="outline"
@@ -62,6 +63,17 @@ export default function SummaryCards({ totalTShirts, orders, onCardClick, onDown
           >
             <Download className="w-3 h-3 sm:w-4 sm:h-4" />
             <span className="text-xs">By Design</span>
+          </Button>
+
+          {/* 🧾 NEW BUTTON FOR ORDERS REPORT */}
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full justify-start gap-1 sm:gap-2 bg-transparent text-xs sm:text-sm"
+            onClick={() => onDownload?.("orders")}
+          >
+            <Download className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="text-xs">Orders Report</span>
           </Button>
         </div>
       </Card>

@@ -25,6 +25,8 @@ export default function AddOrderDialog({ open, onOpenChange, onAddOrder, colors,
     color: colors[0] || "",
     size: "M",
     design: designs[0] || "",
+    paymentStatus: "pending",
+    price: "",
   })
 
   const [ordersToAdd, setOrdersToAdd] = useState<any[]>([])
@@ -35,12 +37,17 @@ export default function AddOrderDialog({ open, onOpenChange, onAddOrder, colors,
       alert("Please fill in all required fields")
       return
     }
-    setOrdersToAdd([...ordersToAdd, { ...formData }])
+    setOrdersToAdd([
+      ...ordersToAdd,
+      { ...formData, price: formData.price ? Number.parseFloat(formData.price) : undefined },
+    ])
     setFormData({
       ...formData,
       color: colors[0] || "",
       size: "M",
       design: designs[0] || "",
+      paymentStatus: "pending",
+      price: "",
     })
   }
 
@@ -59,6 +66,8 @@ export default function AddOrderDialog({ open, onOpenChange, onAddOrder, colors,
       color: colors[0] || "",
       size: "M",
       design: designs[0] || "",
+      paymentStatus: "pending",
+      price: "",
     })
     setOrdersToAdd([])
     onOpenChange(false)
@@ -173,6 +182,29 @@ export default function AddOrderDialog({ open, onOpenChange, onAddOrder, colors,
                   ))}
                 </select>
               </div>
+              <div>
+                <label className="block text-xs sm:text-sm font-medium mb-1">Payment Status *</label>
+                <select
+                  value={formData.paymentStatus}
+                  onChange={(e) => setFormData({ ...formData, paymentStatus: e.target.value })}
+                  className="w-full px-2 sm:px-3 py-2 border border-gray-300 rounded-md text-xs sm:text-sm"
+                >
+                  <option value="pending">Pending</option>
+                  <option value="partially paid">Partially Paid</option>
+                  <option value="fully paid">Fully Paid</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs sm:text-sm font-medium mb-1">Price</label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  value={formData.price}
+                  onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                  placeholder="Enter price"
+                  className="text-xs sm:text-sm"
+                />
+              </div>
             </div>
           </div>
 
@@ -188,7 +220,8 @@ export default function AddOrderDialog({ open, onOpenChange, onAddOrder, colors,
                     className="flex items-center justify-between bg-gray-50 p-2 sm:p-3 rounded-md text-xs sm:text-sm"
                   >
                     <span>
-                      {order.color} - {order.size} - {order.design}
+                      {order.color} - {order.size} - {order.design} - {order.paymentStatus}
+                      {order.price && ` - ${order.price}`}
                     </span>
                     <button
                       type="button"
@@ -232,6 +265,8 @@ export default function AddOrderDialog({ open, onOpenChange, onAddOrder, colors,
                   color: colors[0] || "",
                   size: "M",
                   design: designs[0] || "",
+                  paymentStatus: "pending",
+                  price: "",
                 })
               }}
             >

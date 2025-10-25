@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { isTokenValid } from "@/lib/jwt"
+import LoginDialog from "@/components/login-dialog"
 import Header from "@/components/header"
 import SummaryCards from "@/components/summary-cards"
 import FilterSection from "@/components/filter-section"
@@ -12,8 +14,13 @@ import ViewOrderDialog from "@/components/view-order-dialog"
 import TrashDialog, { type Order } from "@/components/trash-dialog"
 import TShirtsBreakdownDialog from "@/components/tshirts-breakdown-dialog"
 import DesignsBreakdownDialog from "@/components/designs-breakdown-dialog"
+import jsPDF from "jspdf"
+import "jspdf-autotable"
 
 export default function Home() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+
   const [orders, setOrders] = useState<Order[]>([])
   const [trashOrders, setTrashOrders] = useState<Order[]>([])
   const [defectiveOrders, setDefectiveOrders] = useState<Order[]>([])
@@ -32,11 +39,19 @@ export default function Home() {
   const [showAddColorDialog, setShowAddColorDialog] = useState(false)
   const [showViewOrderDialog, setShowViewOrderDialog] = useState(false)
   const [showTrashDialog, setShowTrashDialog] = useState(false)
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(null)
+  const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null)
   const [showTShirtsBreakdown, setShowTShirtsBreakdown] = useState(false)
   const [showDesignsBreakdown, setShowDesignsBreakdown] = useState(false)
 
   const itemsPerPage = 10
+
+  useEffect(() => {
+    const token = localStorage.getItem("authToken")
+    if (token && isTokenValid(token)) {
+      setIsAuthenticated(true)
+    }
+    setIsLoading(false)
+  }, [])
 
   useEffect(() => {
     const savedOrders = localStorage.getItem("orders")
@@ -71,6 +86,23 @@ export default function Home() {
   useEffect(() => {
     localStorage.setItem("designs", JSON.stringify(designs))
   }, [designs])
+
+  const handleLogout = () => {
+    localStorage.removeItem("authToken")
+    setIsAuthenticated(false)
+  }
+
+  const handleLogin = (token: string) => {
+    setIsAuthenticated(true)
+  }
+
+  if (isLoading) {
+    return <div className="min-h-screen bg-background flex items-center justify-center">Loading...</div>
+  }
+
+  if (!isAuthenticated) {
+    return <LoginDialog onLogin={handleLogin} />
+  }
 
   const uniqueCustomers = Array.from(new Set(orders.map((o) => o.name))).map((name) => {
     const customer = orders.find((o) => o.name === name)
@@ -120,16 +152,12 @@ export default function Home() {
     setShowAddOrderDialog(false)
   }
 
-const handleAddMoreOrder = (newOrder: Order) => {
-  setOrders((prev) => {
-    // Generate new unique ID
-    const id = nextId()
-    const orderWithId = { ...newOrder, id, isDefective: false }
-    return [...prev, orderWithId]
-  })
-}
-
-
+  const handleAddMoreOrder = (order: any) => {
+    setOrders((prev) => {
+      const id = nextId()
+      return [...prev, { ...order, id, isDefective: false }]
+    })
+  }
 
   const handleDeleteOrder = (orderId: number) => {
     if (confirm("Are you sure you want to delete this order?")) {
@@ -154,16 +182,11 @@ const handleAddMoreOrder = (newOrder: Order) => {
     setFilterDesign("All")
     setCurrentPage(1)
   }
-const handleViewOrder = (customerName: string) => {
-  const customer = {
-    name: customerName,
-    ...orders.find((o) => o.name === customerName),
-    orders: orders.filter((o) => o.name === customerName),
-  }
-  setSelectedCustomer(customer)
-  setShowViewOrderDialog(true)
-}
 
+  const handleViewOrder = (customerName: string) => {
+    setSelectedCustomer(customerName)
+    setShowViewOrderDialog(true)
+  }
 
   const handleMarkDefective = (orderId: number, note?: string) => {
     const found = orders.find((o) => o.id === orderId)
@@ -188,106 +211,233 @@ const handleViewOrder = (customerName: string) => {
     setSelectedCustomer(updatedCustomer.name || selectedCustomer)
   }
 
-  const handleDownload = (type: "total" | "byDesign") => {
-    let content = ""
+  
 
-    if (type === "total") {
-      const breakdown = orders.reduce(
-        (acc, order) => {
-          const key = `${order.color}-${order.size}`
-          if (!acc[key]) {
-            acc[key] = { color: order.color, size: order.size, quantity: 0 }
-          }
-          acc[key].quantity += 1
-          return acc
-        },
-        {} as Record<string, { color: string; size: string; quantity: number }>,
+// Extend Order type for reports
+type ExtendedOrder = Order & {
+  total?: number | string
+  status?: string
+  price?: number | string
+}
+
+const handleDownload = (type: "total" | "byDesign" | "orders") => {
+  const typedOrders = orders as ExtendedOrder[]
+  const doc = new jsPDF()
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const center = (text: string, y: number) =>
+    doc.text(text, pageWidth / 2, y, { align: "center" })
+  const date = new Date().toLocaleDateString()
+  const sizeOrder = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"]
+
+  doc.setFont("helvetica", "bold")
+  doc.setFontSize(14)
+
+
+  // 🧾 ORDERS REPORT (grouped per customer, with single total)
+if (type === "orders") {
+  center("ORDERS REPORT", 15)
+  doc.setFontSize(10)
+  doc.setFont("helvetica", "normal")
+
+  // ✅ Group orders by customer name
+  const grouped = typedOrders.reduce((acc, order) => {
+    if (!acc[order.name]) acc[order.name] = []
+    acc[order.name].push(order)
+    return acc
+  }, {} as Record<string, ExtendedOrder[]>)
+
+  const customers = Object.keys(grouped)
+  let y = 28
+
+  customers.forEach((name, index) => {
+    const customerOrders = grouped[name]
+    const customer = customerOrders[0]
+
+    // 🧍 Customer Info
+    doc.setFont("helvetica", "bold")
+    doc.text(`Customer: ${name}`, 14, y)
+    y += 6
+    doc.setFont("helvetica", "normal")
+    if (customer.phone) doc.text(`Phone: ${customer.phone}`, 20, y), (y += 5)
+    if (customer.address) doc.text(`Address: ${customer.address}`, 20, y), (y += 5)
+    if (customer.chapter) doc.text(`Chapter: ${customer.chapter}`, 20, y), (y += 5)
+
+    // 🧾 Orders List
+    y += 3
+    doc.setFont("helvetica", "bold")
+    doc.text("ORDERS:", 20, y)
+    doc.setFont("helvetica", "normal")
+    y += 5
+
+    let customerTotal = 0
+
+    customerOrders.forEach((order) => {
+      const price = Number(order.total) || 0
+      customerTotal += price
+
+      doc.text(`• ${order.design} | ${order.color} | ${order.size}`, 25, y)
+      y += 5
+      doc.text(
+        `  Price: ₱${price.toLocaleString("en-PH", { minimumFractionDigits: 2 })}   Status: ${order.status || "N/A"}`,
+        30,
+        y
       )
+      y += 6
+      if (y > 270) {
+        doc.addPage()
+        y = 20
+      }
+    })
 
-      const sizeOrder = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"]
-      const sorted = Object.values(breakdown).sort((a, b) => {
-        if (a.color !== b.color) return a.color.localeCompare(b.color)
-        return sizeOrder.indexOf(a.size) - sizeOrder.indexOf(b.size)
-      })
+    // 💰 Customer total (once only)
+    y += 3
+    doc.setFont("helvetica", "bold")
+    doc.text(
+      `Total: ₱${customerTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`,
+      20,
+      y
+    )
+    doc.setFont("helvetica", "normal")
+    y += 8
 
-      const totalQuantity = sorted.reduce((sum, item) => sum + item.quantity, 0)
+    // Divider line
+    doc.text("________________________________________", 14, y)
+    y += 10
 
-      content = "╔════════════════════════════════════════════════════════════════╗\n"
-      content += "║                    THE UNDERGRADS                             ║\n"
-      content += "║                  Total Ordered T-Shirts                       ║\n"
-      content += "╚════════════════════════════════════════════════════════════════╝\n\n"
-      content += "═════════════════════════════════════════════════════════════════\n"
-      content += "COLOR        │    SIZE      │   QUANTITY   │    TOTAL\n"
-      content += "─────────────────────────────────────────────────────────────────\n"
-
-      let currentColor = ""
-      sorted.forEach((item) => {
-        if (item.color !== currentColor) {
-          if (currentColor !== "") {
-            content += "═════════════════════════════════════════════════════════════════\n\n"
-          }
-          currentColor = item.color
-        }
-        content += `${item.color.padEnd(12)} │ ${item.size.padEnd(12)} │ ${String(item.quantity).padEnd(12)} │ ${item.quantity}\n`
-      })
-
-      content += "═════════════════════════════════════════════════════════════════\n"
-      content += `\n                    TOTAL = ${totalQuantity}\n\n`
-    } else {
-      const breakdown = orders.reduce(
-        (acc, order) => {
-          const key = `${order.design}-${order.color}-${order.size}`
-          if (!acc[key]) {
-            acc[key] = { design: order.design, color: order.color, size: order.size, quantity: 0 }
-          }
-          acc[key].quantity += 1
-          return acc
-        },
-        {} as Record<string, { design: string; color: string; size: string; quantity: number }>,
-      )
-
-      const sizeOrder = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"]
-      const sorted = Object.values(breakdown).sort((a, b) => {
-        if (a.design !== b.design) return a.design.localeCompare(b.design)
-        if (a.color !== b.color) return a.color.localeCompare(b.color)
-        return sizeOrder.indexOf(a.size) - sizeOrder.indexOf(b.size)
-      })
-
-      const totalQuantity = sorted.reduce((sum, item) => sum + item.quantity, 0)
-
-      content = "╔════════════════════════════════════════════════════════════════╗\n"
-      content += "║                    THE UNDERGRADS                             ║\n"
-      content += "║            Ordered T-Shirts With Design                       ║\n"
-      content += "╚════════════════════════════════════════════════════════════════╝\n\n"
-
-      let currentDesign = ""
-      sorted.forEach((item) => {
-        if (item.design !== currentDesign) {
-          if (currentDesign !== "") {
-            content += "═════════════════════════════════════════════════════════════════\n\n"
-          }
-          currentDesign = item.design
-          content += `\n${item.design}\n`
-          content += "═════════════════════════════════════════════════════════════════\n"
-          content += "COLOR        │    SIZE      │   QUANTITY   │    TOTAL\n"
-          content += "─────────────────────────────────────────────────────────────────\n"
-        }
-        content += `${item.color.padEnd(12)} │ ${item.size.padEnd(12)} │ ${String(item.quantity).padEnd(12)} │ ${item.quantity}\n`
-      })
-
-      content += "═════════════════════════════════════════════════════════════════\n"
-      content += `\n                    TOTAL = ${totalQuantity}\n\n`
+    if (y > 270 && index < customers.length - 1) {
+      doc.addPage()
+      y = 20
     }
+  })
 
-    // Create and download file
-    const element = document.createElement("a")
-    element.setAttribute("href", "data:text/plain;charset=utf-8," + encodeURIComponent(content))
-    element.setAttribute("download", type === "total" ? "tshirts-total.txt" : "tshirts-by-design.txt")
-    element.style.display = "none"
-    document.body.appendChild(element)
-    element.click()
-    document.body.removeChild(element)
+  // 🧮 Total customers
+  doc.setFont("helvetica", "bold")
+  doc.text(`TOTAL CUSTOMERS: ${customers.length}`, 14, 280)
+  doc.setFont("helvetica", "italic")
+  center(`Generated on: ${date}`, 288)
+  doc.save("orders-report.pdf")
+  return
+}
+
+  // 🟦 TOTAL REPORT
+  if (type === "total") {
+    center("THE UNDERGRADS", 15)
+    center("Total Ordered T-Shirts", 22)
+    doc.setFontSize(10)
+    doc.setFont("helvetica", "normal")
+
+    const breakdown = typedOrders.reduce((acc, o) => {
+      const key = `${o.color}-${o.size}`
+      if (!acc[key]) acc[key] = { color: o.color, size: o.size, quantity: 0 }
+      acc[key].quantity++
+      return acc
+    }, {} as Record<string, { color: string; size: string; quantity: number }>)
+
+    const sorted = Object.values(breakdown).sort((a, b) => {
+      if (a.color !== b.color) return a.color.localeCompare(b.color)
+      return sizeOrder.indexOf(a.size) - sizeOrder.indexOf(b.size)
+    })
+
+    let y = 35
+    let total = 0
+    let currentColor = ""
+
+    sorted.forEach((item) => {
+      if (item.color !== currentColor) {
+        if (currentColor !== "") {
+          doc.text("_____________________________________________________", 14, y)
+          y += 6
+        }
+        currentColor = item.color
+        doc.setFont("helvetica", "bold")
+        doc.text(`COLOR: ${currentColor}`, 14, y)
+        y += 6
+        doc.setFont("helvetica", "normal")
+      }
+
+      doc.text(`Size: ${item.size}   Qty: ${item.quantity}`, 20, y)
+      total += item.quantity
+      y += 6
+      if (y > 270) { doc.addPage(); y = 20 }
+    })
+
+    y += 8
+    doc.setFont("helvetica", "bold")
+    doc.text(`TOTAL = ${total}`, 14, y)
+    doc.setFont("helvetica", "italic")
+    center(`Generated on: ${date}`, 288)
+    doc.save("tshirts-total.pdf")
+    return
   }
+
+  // 🎨 BY DESIGN REPORT
+  if (type === "byDesign") {
+    center("THE UNDERGRADS", 15)
+    center("Ordered T-Shirts With Design", 22)
+    doc.setFontSize(10)
+    doc.setFont("helvetica", "normal")
+
+    const breakdown = typedOrders.reduce((acc, o) => {
+      const key = `${o.design}-${o.color}-${o.size}`
+      if (!acc[key]) acc[key] = { design: o.design, color: o.color, size: o.size, quantity: 0 }
+      acc[key].quantity++
+      return acc
+    }, {} as Record<string, { design: string; color: string; size: string; quantity: number }>)
+
+    const sorted = Object.values(breakdown).sort((a, b) => {
+      if (a.design !== b.design) return a.design.localeCompare(b.design)
+      if (a.color !== b.color) return a.color.localeCompare(b.color)
+      return sizeOrder.indexOf(a.size) - sizeOrder.indexOf(b.size)
+    })
+
+    let y = 35
+    let total = 0
+    let currentDesign = ""
+    let currentColor = ""
+
+    sorted.forEach((item) => {
+      if (item.design !== currentDesign) {
+        if (currentDesign !== "") {
+          doc.text("_____________________________________________________", 14, y)
+          y += 6
+        }
+        currentDesign = item.design
+        y += 6
+        doc.setFont("helvetica", "bold")
+        doc.text(`DESIGN: ${currentDesign}`, 14, y)
+        y += 5
+        currentColor = ""
+      }
+
+      if (item.color !== currentColor) {
+        currentColor = item.color
+        y += 6
+        doc.text(`Color: ${currentColor}`, 18, y)
+        y += 4
+      }
+
+      doc.setFont("helvetica", "normal")
+      doc.text(`Size: ${item.size}   Qty: ${item.quantity}`, 25, y)
+      y += 6
+      total += item.quantity
+
+      if (y > 270) { doc.addPage(); y = 20 }
+    })
+
+    y += 8
+    doc.setFont("helvetica", "bold")
+    doc.text(`TOTAL = ${total}`, 14, y)
+    doc.setFont("helvetica", "italic")
+    center(`Generated on: ${date}`, 288)
+    doc.save("tshirts-by-design.pdf")
+    return
+  }
+}
+
+
+
+
+
 
   const handleSummaryCardClick = (type: "total" | "designs") => {
     if (type === "total") {
@@ -306,6 +456,7 @@ const handleViewOrder = (customerName: string) => {
         onAddColor={() => setShowAddColorDialog(true)}
         onDeleteAll={handleDeleteAll}
         onViewTrash={() => setShowTrashDialog(true)}
+        onLogout={handleLogout}
       />
 
       <main className="container mx-auto px-4 py-8">
@@ -446,24 +597,21 @@ const handleViewOrder = (customerName: string) => {
         onDeleteColor={(c) => setColors((p) => p.filter((x) => x !== c))}
         existingColors={colors}
       />
-     {selectedCustomer && (
-  <ViewOrderDialog
-    open={showViewOrderDialog}
-    onOpenChange={setShowViewOrderDialog}
-    customerName={selectedCustomer.name}
-    customerOrders={orders.filter((o) => o.name === selectedCustomer?.name)}
-
-    colors={colors}
-    designs={designs}
-    onAddMoreOrder={handleAddMoreOrder}
-    onDeleteOrder={handleDeleteOrder}
-    onEditOrder={(order) => {
-      setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, ...order } : o)))
-    }}
-    onMarkDefective={handleMarkDefective}
-    onEditCustomer={handleEditCustomer}
-  />
-)}
+      <ViewOrderDialog
+        open={showViewOrderDialog}
+        onOpenChange={setShowViewOrderDialog}
+        customerName={selectedCustomer}
+        customerOrders={selectedCustomer ? orders.filter((o) => o.name === selectedCustomer) : []}
+        colors={colors}
+        designs={designs}
+        onAddMoreOrder={handleAddMoreOrder}
+        onDeleteOrder={handleDeleteOrder}
+        onEditOrder={(order) => {
+          setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, ...order } : o)))
+        }}
+        onMarkDefective={handleMarkDefective}
+        onEditCustomer={handleEditCustomer}
+      />
 
       {/* TRASH DIALOG */}
       <TrashDialog

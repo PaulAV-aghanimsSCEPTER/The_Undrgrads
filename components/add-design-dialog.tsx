@@ -37,7 +37,11 @@ export default function AddDesignDialog({
           <div>
             <label className="block text-sm font-medium mb-1">Add New Design</label>
             <div className="flex gap-2">
-              <Input value={newDesign} onChange={(e) => setNewDesign(e.target.value)} placeholder="Enter design name" />
+              <Input
+                value={newDesign}
+                onChange={(e) => setNewDesign(e.target.value)}
+                placeholder="Enter design name"
+              />
               <Button onClick={handleAdd} className="bg-green-600 hover:bg-green-700">
                 Add
               </Button>
@@ -45,7 +49,7 @@ export default function AddDesignDialog({
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">Existing Designs</label>
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-60 overflow-y-auto">
               {existingDesigns.map((design) => (
                 <div key={design} className="flex justify-between items-center p-2 bg-gray-100 rounded">
                   <span>{design}</span>

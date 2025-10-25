@@ -8,9 +8,17 @@ interface HeaderProps {
   onAddColor: () => void
   onDeleteAll: () => void
   onViewTrash: () => void
+  onLogout: () => void
 }
 
-export default function Header({ onAddOrder, onAddDesign, onAddColor, onDeleteAll, onViewTrash }: HeaderProps) {
+export default function Header({
+  onAddOrder,
+  onAddDesign,
+  onAddColor,
+  onDeleteAll,
+  onViewTrash,
+  onLogout,
+}: HeaderProps) {
   return (
     <header className="bg-white border-b border-gray-200 shadow-sm">
       <div className="container mx-auto px-2 sm:px-4 py-3 sm:py-4">
@@ -22,6 +30,14 @@ export default function Header({ onAddOrder, onAddDesign, onAddColor, onDeleteAl
             </Button>
             <Button onClick={onDeleteAll} variant="destructive" size="sm" className="text-xs sm:text-sm">
               Delete All
+            </Button>
+            <Button
+              onClick={onLogout}
+              variant="outline"
+              size="sm"
+              className="text-xs sm:text-sm bg-red-50 hover:bg-red-100 text-red-700"
+            >
+              Logout
             </Button>
           </div>
         </div>

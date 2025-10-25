@@ -37,7 +37,11 @@ export default function AddColorDialog({
           <div>
             <label className="block text-sm font-medium mb-1">Add New Color</label>
             <div className="flex gap-2">
-              <Input value={newColor} onChange={(e) => setNewColor(e.target.value)} placeholder="Enter color name" />
+              <Input
+                value={newColor}
+                onChange={(e) => setNewColor(e.target.value)}
+                placeholder="Enter color name"
+              />
               <Button onClick={handleAdd} className="bg-green-600 hover:bg-green-700">
                 Add
               </Button>
@@ -45,7 +49,7 @@ export default function AddColorDialog({
           </div>
           <div>
             <label className="block text-sm font-medium mb-2">Existing Colors</label>
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-60 overflow-y-auto">
               {existingColors.map((color) => (
                 <div key={color} className="flex justify-between items-center p-2 bg-gray-100 rounded">
                   <span>{color}</span>
