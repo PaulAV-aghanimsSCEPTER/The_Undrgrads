@@ -1,11 +1,11 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { X } from "lucide-react"
+import { supabase } from "@/lib/supabase"
 
 interface AddOrderDialogProps {
   open: boolean
@@ -15,7 +15,13 @@ interface AddOrderDialogProps {
   designs: string[]
 }
 
-export default function AddOrderDialog({ open, onOpenChange, onAddOrder, colors, designs }: AddOrderDialogProps) {
+export default function AddOrderDialog({
+  open,
+  onOpenChange,
+  onAddOrder,
+  colors,
+  designs,
+}: AddOrderDialogProps) {
   const [formData, setFormData] = useState({
     name: "",
     phone: "",
@@ -51,16 +57,52 @@ export default function AddOrderDialog({ open, onOpenChange, onAddOrder, colors,
     })
   }
 
-  const handleSubmitAll = () => {
-    if (ordersToAdd.length === 0) {
-      alert("Please add at least one order")
+  const handleSubmitAll = async () => {
+  if (ordersToAdd.length === 0) {
+    alert("Please add at least one order")
+    return
+  }
+
+  try {
+    const formattedOrders = ordersToAdd.map((order) => ({
+      name: formData.name,
+      phone: formData.phone,
+      facebook: formData.facebook,
+      chapter: formData.chapter,
+      address: formData.address,
+      color: order.color,
+      size: order.size,
+      design: order.design,
+      note: "",
+      status: "Pending",
+      created_at: new Date(),
+    }))
+
+    console.log("🌐 URL:", process.env.NEXT_PUBLIC_SUPABASE_URL);
+console.log("🔑 Key (first 10 chars):", process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.slice(0, 10));
+console.log("📦 Sending orders:", formattedOrders);
+
+
+    const { data, error } = await supabase
+      .from("orders")
+      .insert(formattedOrders)
+      .select() // ✅ Ensures Supabase returns the inserted rows
+
+    if (error) {
+      console.error("❌ Error inserting orders:", error)
+      alert("Failed to save orders. Please check console.")
       return
     }
-    // instead of ordersToAdd.forEach((order) => onAddOrder(order))
-if (ordersToAdd.length > 0) {
-  onAddOrder(ordersToAdd)
-}
 
+    console.log("✅ Orders saved to Supabase:", data)
+    alert("Orders successfully saved to database!")
+
+    // ✅ Fix: Make sure data is typed and safely looped
+    if (data && Array.isArray(data)) {
+      data.forEach((order: any) => onAddOrder(order))
+    }
+
+    // Reset
     setFormData({
       name: "",
       phone: "",
@@ -75,10 +117,16 @@ if (ordersToAdd.length > 0) {
     })
     setOrdersToAdd([])
     onOpenChange(false)
+  } catch (err) {
+    console.error("Unexpected error:", err)
+    alert("Something went wrong while saving.")
   }
+}
 
+
+  // 🧩 FIX: Add this missing function
   const handleRemoveOrder = (index: number) => {
-    setOrdersToAdd(ordersToAdd.filter((_, i) => i !== index))
+    setOrdersToAdd((prevOrders) => prevOrders.filter((_, i) => i !== index))
   }
 
   if (!open) return null
