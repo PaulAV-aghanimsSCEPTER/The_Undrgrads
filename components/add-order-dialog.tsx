@@ -56,7 +56,11 @@ export default function AddOrderDialog({ open, onOpenChange, onAddOrder, colors,
       alert("Please add at least one order")
       return
     }
-    ordersToAdd.forEach((order) => onAddOrder(order))
+    // instead of ordersToAdd.forEach((order) => onAddOrder(order))
+if (ordersToAdd.length > 0) {
+  onAddOrder(ordersToAdd)
+}
+
     setFormData({
       name: "",
       phone: "",

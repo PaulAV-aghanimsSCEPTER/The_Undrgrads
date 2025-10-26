@@ -68,7 +68,9 @@ export default function ViewOrderDialog({
     price: "",
   })
 
-  // Reset customerData when customer changes
+  // For delete confirmation
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null)
+
   useEffect(() => {
     setCustomerData({
       name: customerName || "",
@@ -90,7 +92,7 @@ export default function ViewOrderDialog({
       ...newOrderData,
       paymentStatus: newOrderData.paymentStatus as "pending" | "partially paid" | "fully paid",
       price: newOrderData.price ? Number.parseFloat(newOrderData.price) : undefined,
-      id: Date.now(), // ensure unique id
+      id: Date.now(),
     }
     onAddMoreOrder(orderToAdd)
     toast({
@@ -105,6 +107,19 @@ export default function ViewOrderDialog({
       paymentStatus: "pending",
       price: "",
     })
+  }
+
+  const handleDeleteOrder = (orderId: number) => {
+    const order = customerOrders.find((o) => o.id === orderId)
+    if (!order) return
+
+    onDeleteOrder(orderId)
+    toast({
+      title: "Order Deleted",
+      description: `Order (${order.color} - ${order.size} - ${order.design}) has been deleted.`,
+      variant: "destructive",
+    })
+    setDeleteConfirmId(null)
   }
 
   if (!open) return null
@@ -222,7 +237,7 @@ export default function ViewOrderDialog({
                     {selectedOrderId === order.id ? "Hide" : "Mark"}
                   </Button>
                   <Button
-                    onClick={() => order.id && onDeleteOrder(order.id)}
+                    onClick={() => setDeleteConfirmId(order.id || null)}
                     size="sm"
                     variant="destructive"
                     className="text-xs flex-1 sm:flex-none"
@@ -233,6 +248,43 @@ export default function ViewOrderDialog({
               </div>
             ))}
           </div>
+
+          {/* Delete confirmation modal */}
+          {deleteConfirmId && (
+            <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-lg p-4 max-w-sm w-full shadow-lg">
+                <h3 className="font-semibold mb-2 sm:mb-3 text-sm sm:text-base">Confirm Deletion</h3>
+                {(() => {
+                  const order = customerOrders.find((o) => o.id === deleteConfirmId)
+                  if (!order) return null
+                  return (
+                    <p className="text-xs sm:text-sm mb-4">
+                      Are you sure you want to delete the order: <br />
+                      <span className="font-medium">
+                        {order.color} - {order.size} - {order.design}
+                      </span>
+                      ? This action cannot be undone.
+                    </p>
+                  )
+                })()}
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <Button
+                    onClick={() => deleteConfirmId && handleDeleteOrder(deleteConfirmId)}
+                    className="bg-red-600 hover:bg-red-700 text-xs sm:text-sm flex-1"
+                  >
+                    Yes, Delete
+                  </Button>
+                  <Button
+                    onClick={() => setDeleteConfirmId(null)}
+                    variant="outline"
+                    className="text-xs sm:text-sm flex-1"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {selectedOrderId && (
             <div className="mt-3 sm:mt-4 p-3 sm:p-3 bg-yellow-50 border border-yellow-200 rounded">
@@ -263,6 +315,7 @@ export default function ViewOrderDialog({
                 >
                   Cancel
                 </Button>
+                
               </div>
             </div>
           )}

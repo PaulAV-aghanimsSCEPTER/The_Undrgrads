@@ -15,11 +15,13 @@ import TrashDialog, { type Order } from "@/components/trash-dialog"
 import TShirtsBreakdownDialog from "@/components/tshirts-breakdown-dialog"
 import DesignsBreakdownDialog from "@/components/designs-breakdown-dialog"
 import jsPDF from "jspdf"
-import "jspdf-autotable"
+import autoTable from "jspdf-autotable"
+import { useRouter } from "next/navigation" 
 
 export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+  const router = useRouter()
 
   const [orders, setOrders] = useState<Order[]>([])
   const [trashOrders, setTrashOrders] = useState<Order[]>([])
@@ -34,12 +36,14 @@ export default function Home() {
   const [filterSize, setFilterSize] = useState("All")
   const [filterDesign, setFilterDesign] = useState("All")
   const [currentPage, setCurrentPage] = useState(1)
+
   const [showAddOrderDialog, setShowAddOrderDialog] = useState(false)
   const [showAddDesignDialog, setShowAddDesignDialog] = useState(false)
   const [showAddColorDialog, setShowAddColorDialog] = useState(false)
   const [showViewOrderDialog, setShowViewOrderDialog] = useState(false)
   const [showTrashDialog, setShowTrashDialog] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null)
+
   const [showTShirtsBreakdown, setShowTShirtsBreakdown] = useState(false)
   const [showDesignsBreakdown, setShowDesignsBreakdown] = useState(false)
 
@@ -67,25 +71,34 @@ export default function Home() {
     if (savedDesigns) setDesigns(JSON.parse(savedDesigns))
   }, [])
 
-  useEffect(() => {
+  // ✅ Load orders when the component mounts
+useEffect(() => {
+  const savedOrders = localStorage.getItem("orders")
+  if (savedOrders) {
+    const parsed = JSON.parse(savedOrders)
+    if (Array.isArray(parsed)) setOrders(parsed)
+  }
+}, [])
+
+// ✅ Save orders only when there is at least 1 order
+useEffect(() => {
+  if (orders.length > 0) {
     localStorage.setItem("orders", JSON.stringify(orders))
-  }, [orders])
+  }
+}, [orders])
 
   useEffect(() => {
+  if (trashOrders.length > 0)
     localStorage.setItem("trashOrders", JSON.stringify(trashOrders))
-  }, [trashOrders])
+}, [trashOrders])
 
-  useEffect(() => {
+useEffect(() => {
+  if (defectiveOrders.length > 0)
     localStorage.setItem("defectiveOrders", JSON.stringify(defectiveOrders))
-  }, [defectiveOrders])
+}, [defectiveOrders])
 
-  useEffect(() => {
-    localStorage.setItem("colors", JSON.stringify(colors))
-  }, [colors])
-
-  useEffect(() => {
-    localStorage.setItem("designs", JSON.stringify(designs))
-  }, [designs])
+  useEffect(() => { localStorage.setItem("colors", JSON.stringify(colors)) }, [colors])
+  useEffect(() => { localStorage.setItem("designs", JSON.stringify(designs)) }, [designs])
 
   const handleLogout = () => {
     localStorage.removeItem("authToken")
@@ -96,25 +109,47 @@ export default function Home() {
     setIsAuthenticated(true)
   }
 
-  if (isLoading) {
-    return <div className="min-h-screen bg-background flex items-center justify-center">Loading...</div>
-  }
+  if (isLoading) return <div className="min-h-screen bg-background flex items-center justify-center">Loading...</div>
+  if (!isAuthenticated) return <LoginDialog onLogin={handleLogin} />
 
-  if (!isAuthenticated) {
-    return <LoginDialog onLogin={handleLogin} />
-  }
+  // -------------------- Utility Functions --------------------
+  const nextId = () =>
+    orders.length + trashOrders.length + defectiveOrders.length === 0
+      ? 1
+      : Math.max(
+          0,
+          ...orders.map((o) => o.id || 0),
+          ...trashOrders.map((t) => t.id || 0),
+          ...defectiveOrders.map((d) => d.id || 0)
+        ) + 1
 
-  const uniqueCustomers = Array.from(new Set(orders.map((o) => o.name))).map((name) => {
-    const customer = orders.find((o) => o.name === name)
+  const uniqueCustomers = Array.from(
+    new Set(orders.map((o) => `${o.name}-${o.phone}-${o.facebook}-${o.address}`))
+  ).map((key) => {
+    const [name, phone, facebook, address] = key.split("-")
+    const customerOrders = orders.filter(
+      (o) =>
+        o.name === name &&
+        (o.phone || "") === phone &&
+        (o.facebook || "") === facebook &&
+        (o.address || "") === address
+    )
+    const customer = customerOrders[0]
     return {
+      id: key,
       name,
-      facebook: customer?.facebook || "",
       phone: customer?.phone || "",
+      facebook: customer?.facebook || "",
       chapter: customer?.chapter || "",
       address: customer?.address || "",
-      orders: orders.filter((o) => o.name === name),
+      orders: customerOrders,
     }
   })
+
+  // Recompute selected customer on every orders update
+  const selectedCustomerObj = selectedCustomer
+    ? uniqueCustomers.find((c) => c.id === selectedCustomer) || null
+    : null
 
   const filteredCustomers = uniqueCustomers.filter((customer) => {
     const matchesName = customer.name.toLowerCase().includes(filterName.toLowerCase())
@@ -131,27 +166,29 @@ export default function Home() {
   const startIndex = (currentPage - 1) * itemsPerPage
   const paginatedCustomers = filteredCustomers.slice(startIndex, startIndex + itemsPerPage)
 
-  const nextId = () =>
-    orders.length + trashOrders.length + defectiveOrders.length === 0
-      ? 1
-      : Math.max(
-          0,
-          ...orders.map((o) => o.id || 0),
-          ...trashOrders.map((t) => t.id || 0),
-          ...defectiveOrders.map((d) => d.id || 0),
-        ) + 1
+  // -------------------- Event Handlers --------------------
+ const handleAddOrder = (newOrders: any[] | any) => {
+  const incoming = Array.isArray(newOrders) ? newOrders : [newOrders]
 
-  const handleAddOrder = (newOrders: any[] | any) => {
-    const incoming = Array.isArray(newOrders) ? newOrders : [newOrders]
+  setOrders((prev) => {
+    const prevMaxId = prev.length === 0 ? 0 : Math.max(...prev.map((o) => o.id || 0))
+    const start = prevMaxId + 1
 
-    setOrders((prev) => {
-      const start = nextId()
-      const withIds = incoming.map((order, i) => ({ ...order, id: start + i, isDefective: false }))
-      return [...prev, ...withIds]
-    })
-    setShowAddOrderDialog(false)
-  }
+    const withIds = incoming.map((order, i) => ({
+      ...order,
+      id: start + i,
+      isDefective: false,
+    }))
 
+    return [...prev, ...withIds]
+  })
+console.log("New orders added:", incoming)
+  setShowAddOrderDialog(false)
+}
+
+
+
+  
   const handleAddMoreOrder = (order: any) => {
     setOrders((prev) => {
       const id = nextId()
@@ -183,8 +220,8 @@ export default function Home() {
     setCurrentPage(1)
   }
 
-  const handleViewOrder = (customerName: string) => {
-    setSelectedCustomer(customerName)
+  const handleViewOrder = (customerId: string) => {
+    setSelectedCustomer(customerId)
     setShowViewOrderDialog(true)
   }
 
@@ -205,13 +242,13 @@ export default function Home() {
     if (!selectedCustomer) return
     setOrders((prev) =>
       prev.map((o) =>
-        o.name === selectedCustomer ? { ...o, ...updatedCustomer, name: updatedCustomer.name || o.name } : o,
-      ),
+        o.name === selectedCustomerObj?.name
+          ? { ...o, ...updatedCustomer, name: updatedCustomer.name || o.name }
+          : o
+      )
     )
     setSelectedCustomer(updatedCustomer.name || selectedCustomer)
   }
-
-  
 
 // Extend Order type for reports
 type ExtendedOrder = Order & {
@@ -232,97 +269,92 @@ const handleDownload = (type: "total" | "byDesign" | "orders") => {
   doc.setFont("helvetica", "bold")
   doc.setFontSize(14)
 
-
   // 🧾 ORDERS REPORT (grouped per customer, with single total)
-if (type === "orders") {
-  center("ORDERS REPORT", 15)
-  doc.setFontSize(10)
-  doc.setFont("helvetica", "normal")
-
-  // ✅ Group orders by customer name
-  const grouped = typedOrders.reduce((acc, order) => {
-    if (!acc[order.name]) acc[order.name] = []
-    acc[order.name].push(order)
-    return acc
-  }, {} as Record<string, ExtendedOrder[]>)
-
-  const customers = Object.keys(grouped)
-  let y = 28
-
-  customers.forEach((name, index) => {
-    const customerOrders = grouped[name]
-    const customer = customerOrders[0]
-
-    // 🧍 Customer Info
-    doc.setFont("helvetica", "bold")
-    doc.text(`Customer: ${name}`, 14, y)
-    y += 6
+  if (type === "orders") {
+    center("ORDERS REPORT", 15)
+    doc.setFontSize(10)
     doc.setFont("helvetica", "normal")
-    if (customer.phone) doc.text(`Phone: ${customer.phone}`, 20, y), (y += 5)
-    if (customer.address) doc.text(`Address: ${customer.address}`, 20, y), (y += 5)
-    if (customer.chapter) doc.text(`Chapter: ${customer.chapter}`, 20, y), (y += 5)
 
-    // 🧾 Orders List
-    y += 3
-    doc.setFont("helvetica", "bold")
-    doc.text("ORDERS:", 20, y)
-    doc.setFont("helvetica", "normal")
-    y += 5
+    const grouped = typedOrders.reduce((acc, order) => {
+      if (!acc[order.name]) acc[order.name] = []
+      acc[order.name].push(order)
+      return acc
+    }, {} as Record<string, ExtendedOrder[]>)
 
-    let customerTotal = 0
+    const customers = Object.keys(grouped)
+    let y = 28
+    let grandTotal = 0
 
-    customerOrders.forEach((order) => {
-      const price = Number(order.total) || 0
-      customerTotal += price
+    customers.forEach((name, index) => {
+      const customerOrders = grouped[name]
+      const customer = customerOrders[0]
 
-      doc.text(`• ${order.design} | ${order.color} | ${order.size}`, 25, y)
+      doc.setFont("helvetica", "bold")
+      doc.text(`Customer: ${name}`, 14, y)
+      y += 6
+      doc.setFont("helvetica", "normal")
+      if (customer.phone) doc.text(`Phone: ${customer.phone}`, 20, y), (y += 5)
+      if (customer.address) doc.text(`Address: ${customer.address}`, 20, y), (y += 5)
+      if (customer.chapter) doc.text(`Chapter: ${customer.chapter}`, 20, y), (y += 5)
+
+      y += 3
+      doc.setFont("helvetica", "bold")
+      doc.text("ORDERS:", 20, y)
+      doc.setFont("helvetica", "normal")
       y += 5
+
+      let customerTotal = 0
+
+      customerOrders.forEach((order) => {
+        const price = Number(order.price) || Number(order.total) || 0
+        customerTotal += price
+
+        doc.text(`• ${order.design} | ${order.color} | ${order.size}`, 25, y)
+        y += 5
+        doc.text(
+          `  Price: ₱${price.toLocaleString("en-PH", { minimumFractionDigits: 2 })}   Status: ${order.status || "N/A"}`,
+          30,
+          y
+        )
+        y += 6
+        if (y > 270) {
+          doc.addPage()
+          y = 20
+        }
+      })
+
+      grandTotal += customerTotal
+      y += 3
+      doc.setFont("helvetica", "bold")
       doc.text(
-        `  Price: ₱${price.toLocaleString("en-PH", { minimumFractionDigits: 2 })}   Status: ${order.status || "N/A"}`,
-        30,
+        `Total: ₱${customerTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`,
+        20,
         y
       )
-      y += 6
-      if (y > 270) {
+      doc.setFont("helvetica", "normal")
+      y += 8
+
+      doc.text("________________________________________", 14, y)
+      y += 10
+
+      if (y > 270 && index < customers.length - 1) {
         doc.addPage()
         y = 20
       }
     })
 
-    // 💰 Customer total (once only)
-    y += 3
     doc.setFont("helvetica", "bold")
-    doc.text(
-      `Total: ₱${customerTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`,
-      20,
-      y
-    )
-    doc.setFont("helvetica", "normal")
-    y += 8
+    doc.text(`TOTAL CUSTOMERS: ${customers.length}`, 14, 280)
+    doc.text(`GRAND TOTAL SALES: ₱${grandTotal.toLocaleString("en-PH", { minimumFractionDigits: 2 })}`, 14, 286)
+    doc.setFont("helvetica", "italic")
+    center(`Generated on: ${date}`, 294)
+    doc.save("orders-report.pdf")
+    return
+  }
 
-    // Divider line
-    doc.text("________________________________________", 14, y)
-    y += 10
-
-    if (y > 270 && index < customers.length - 1) {
-      doc.addPage()
-      y = 20
-    }
-  })
-
-  // 🧮 Total customers
-  doc.setFont("helvetica", "bold")
-  doc.text(`TOTAL CUSTOMERS: ${customers.length}`, 14, 280)
-  doc.setFont("helvetica", "italic")
-  center(`Generated on: ${date}`, 288)
-  doc.save("orders-report.pdf")
-  return
-}
-
-  // 🟦 TOTAL REPORT
+  // 🟦 TOTAL T-SHIRTS REPORT
   if (type === "total") {
-    center("THE UNDERGRADS", 15)
-    center("Total Ordered T-Shirts", 22)
+    center("TOTAL ORDERED T-SHIRTS", 15)
     doc.setFontSize(10)
     doc.setFont("helvetica", "normal")
 
@@ -338,42 +370,31 @@ if (type === "orders") {
       return sizeOrder.indexOf(a.size) - sizeOrder.indexOf(b.size)
     })
 
-    let y = 35
-    let total = 0
-    let currentColor = ""
+    const tableData = sorted.map((item) => [item.color, item.size, item.quantity])
 
-    sorted.forEach((item) => {
-      if (item.color !== currentColor) {
-        if (currentColor !== "") {
-          doc.text("_____________________________________________________", 14, y)
-          y += 6
-        }
-        currentColor = item.color
-        doc.setFont("helvetica", "bold")
-        doc.text(`COLOR: ${currentColor}`, 14, y)
-        y += 6
-        doc.setFont("helvetica", "normal")
-      }
+autoTable(doc, {
+  head: [["Color", "Size", "Quantity"]],
+  body: tableData,
+  startY: 30,
+  theme: "grid",
+  styles: { fontSize: 9, halign: "center" },
+  headStyles: { fillColor: [59, 130, 246] },
+})
 
-      doc.text(`Size: ${item.size}   Qty: ${item.quantity}`, 20, y)
-      total += item.quantity
-      y += 6
-      if (y > 270) { doc.addPage(); y = 20 }
-    })
 
-    y += 8
+    const totalQty = sorted.reduce((sum, x) => sum + x.quantity, 0)
+    const finalY = (doc as any).lastAutoTable.finalY + 10
     doc.setFont("helvetica", "bold")
-    doc.text(`TOTAL = ${total}`, 14, y)
+    doc.text(`TOTAL: ${totalQty}`, 14, finalY)
     doc.setFont("helvetica", "italic")
-    center(`Generated on: ${date}`, 288)
+    center(`Generated on: ${date}`, finalY + 10)
     doc.save("tshirts-total.pdf")
     return
   }
 
   // 🎨 BY DESIGN REPORT
   if (type === "byDesign") {
-    center("THE UNDERGRADS", 15)
-    center("Ordered T-Shirts With Design", 22)
+    center("TOTAL ORDERED T-SHIRTS BY DESIGN", 15)
     doc.setFontSize(10)
     doc.setFont("helvetica", "normal")
 
@@ -390,63 +411,31 @@ if (type === "orders") {
       return sizeOrder.indexOf(a.size) - sizeOrder.indexOf(b.size)
     })
 
-    let y = 35
-    let total = 0
-    let currentDesign = ""
-    let currentColor = ""
+    const tableData = sorted.map((item) => [item.design, item.color, item.size, item.quantity])
 
-    sorted.forEach((item) => {
-      if (item.design !== currentDesign) {
-        if (currentDesign !== "") {
-          doc.text("_____________________________________________________", 14, y)
-          y += 6
-        }
-        currentDesign = item.design
-        y += 6
-        doc.setFont("helvetica", "bold")
-        doc.text(`DESIGN: ${currentDesign}`, 14, y)
-        y += 5
-        currentColor = ""
-      }
+ autoTable(doc, {
+  head: [["Design", "Color", "Size", "Quantity"]],
+  body: tableData,
+  startY: 30,
+  theme: "grid",
+  styles: { fontSize: 9, halign: "center" },
+  headStyles: { fillColor: [59, 130, 246] },
+})
 
-      if (item.color !== currentColor) {
-        currentColor = item.color
-        y += 6
-        doc.text(`Color: ${currentColor}`, 18, y)
-        y += 4
-      }
 
-      doc.setFont("helvetica", "normal")
-      doc.text(`Size: ${item.size}   Qty: ${item.quantity}`, 25, y)
-      y += 6
-      total += item.quantity
-
-      if (y > 270) { doc.addPage(); y = 20 }
-    })
-
-    y += 8
+    const totalQty = sorted.reduce((sum, x) => sum + x.quantity, 0)
+    const finalY = (doc as any).lastAutoTable.finalY + 10
     doc.setFont("helvetica", "bold")
-    doc.text(`TOTAL = ${total}`, 14, y)
+    doc.text(`TOTAL: ${totalQty}`, 14, finalY)
     doc.setFont("helvetica", "italic")
-    center(`Generated on: ${date}`, 288)
+    center(`Generated on: ${date}`, finalY + 10)
     doc.save("tshirts-by-design.pdf")
     return
   }
 }
 
 
-
-
-
-
-  const handleSummaryCardClick = (type: "total" | "designs") => {
-    if (type === "total") {
-      setShowTShirtsBreakdown(true)
-    } else if (type === "designs") {
-      setShowDesignsBreakdown(true)
-    }
-  }
-
+  // -------------------- Render --------------------
   return (
     <div className="min-h-screen bg-background">
       {/* HEADER */}
@@ -457,15 +446,22 @@ if (type === "orders") {
         onDeleteAll={handleDeleteAll}
         onViewTrash={() => setShowTrashDialog(true)}
         onLogout={handleLogout}
+         onExportPDF={() => handleDownload("orders")}
       />
 
       <main className="container mx-auto px-4 py-8">
-        <SummaryCards
-          totalTShirts={orders.length}
-          orders={orders}
-          onCardClick={handleSummaryCardClick}
-          onDownload={handleDownload}
-        />
+      <SummaryCards
+  totalTShirts={orders.length}
+  orders={orders}
+  onCardClick={(type) => {
+    if (type === "total") setShowTShirtsBreakdown(true)
+    if (type === "designs") setShowDesignsBreakdown(true)
+  }}
+  onDownload={handleDownload}   // ✅ this links buttons to your export code
+/>
+
+
+        {/* FILTER SECTION */}
 
         <FilterSection
           filterName={filterName}
@@ -493,45 +489,21 @@ if (type === "orders") {
           defectiveItems={defectiveOrders}
         />
 
+        {/* Defective Orders Section */}
         {defectiveOrders.length > 0 && (
           <div className="mt-8 p-6 bg-red-50 border border-red-200 rounded-lg">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-2xl font-bold text-red-700">Defective Items ({defectiveOrders.length})</h2>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => {
-                    if (confirm("Retrieve all defective items?")) {
-                      setOrders((prev) => [...prev, ...defectiveOrders])
-                      setDefectiveOrders([])
-                    }
-                  }}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded"
-                >
-                  Retrieve All
-                </button>
-                <button
-                  onClick={() => {
-                    if (confirm("Delete all defective items permanently?")) {
-                      setDefectiveOrders([])
-                    }
-                  }}
-                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded"
-                >
-                  Delete All
-                </button>
-              </div>
-            </div>
-            <div className="overflow-x-auto">
+            <h2 className="text-2xl font-bold text-red-700">Defective Items ({defectiveOrders.length})</h2>
+            <div className="overflow-x-auto mt-4">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b-2 border-red-300">
-                    <th className="text-left p-2">Customer</th>
-                    <th className="text-left p-2">Color</th>
-                    <th className="text-left p-2">Size</th>
-                    <th className="text-left p-2">Design</th>
-                    <th className="text-left p-2">Defect Note</th>
-                    <th className="text-left p-2">Date</th>
-                    <th className="text-left p-2">Actions</th>
+                    <th className="p-2 text-left">Customer</th>
+                    <th className="p-2 text-left">Color</th>
+                    <th className="p-2 text-left">Size</th>
+                    <th className="p-2 text-left">Design</th>
+                    <th className="p-2 text-left">Defect Note</th>
+                    <th className="p-2 text-left">Date</th>
+                    <th className="p-2 text-left">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -583,6 +555,7 @@ if (type === "orders") {
         colors={colors}
         designs={designs}
       />
+
       <AddDesignDialog
         open={showAddDesignDialog}
         onOpenChange={setShowAddDesignDialog}
@@ -590,6 +563,7 @@ if (type === "orders") {
         onDeleteDesign={(d) => setDesigns((p) => p.filter((x) => x !== d))}
         existingDesigns={designs}
       />
+
       <AddColorDialog
         open={showAddColorDialog}
         onOpenChange={setShowAddColorDialog}
@@ -597,23 +571,21 @@ if (type === "orders") {
         onDeleteColor={(c) => setColors((p) => p.filter((x) => x !== c))}
         existingColors={colors}
       />
+
       <ViewOrderDialog
         open={showViewOrderDialog}
         onOpenChange={setShowViewOrderDialog}
-        customerName={selectedCustomer}
-        customerOrders={selectedCustomer ? orders.filter((o) => o.name === selectedCustomer) : []}
+        customerName={selectedCustomerObj?.name || ""}
+        customerOrders={selectedCustomerObj?.orders || []}
         colors={colors}
         designs={designs}
         onAddMoreOrder={handleAddMoreOrder}
         onDeleteOrder={handleDeleteOrder}
-        onEditOrder={(order) => {
-          setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, ...order } : o)))
-        }}
+        onEditOrder={(order) => setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, ...order } : o)))}
         onMarkDefective={handleMarkDefective}
         onEditCustomer={handleEditCustomer}
       />
 
-      {/* TRASH DIALOG */}
       <TrashDialog
         open={showTrashDialog}
         onOpenChange={setShowTrashDialog}
@@ -622,27 +594,15 @@ if (type === "orders") {
           const retrieved = trashOrders.find((o) => o.id === id)
           if (retrieved) {
             setOrders((prev) => [...prev, retrieved])
-            setTrashOrders((prev) => prev.filter((o) => o.id === id))
+            setTrashOrders((prev) => prev.filter((o) => o.id !== id))
           }
         }}
-        onDeleteOrderPermanently={(id) => {
-          setTrashOrders((prev) => prev.filter((o) => o.id !== id))
-        }}
-        onRetrieveAll={() => {
-          setOrders((prev) => [...prev, ...trashOrders])
-          setTrashOrders([])
-        }}
-        onDeleteAllPermanently={() => {
-          setTrashOrders([])
-        }}
+        onDeleteOrderPermanently={(id) => setTrashOrders((prev) => prev.filter((o) => o.id !== id))}
+        onRetrieveAll={() => { setOrders((prev) => [...prev, ...trashOrders]); setTrashOrders([]) }}
+        onDeleteAllPermanently={() => setTrashOrders([])}
       />
 
-      <TShirtsBreakdownDialog
-        open={showTShirtsBreakdown}
-        onOpenChange={setShowTShirtsBreakdown}
-        orders={orders}
-        type="total"
-      />
+      <TShirtsBreakdownDialog open={showTShirtsBreakdown} onOpenChange={setShowTShirtsBreakdown} orders={orders} type="total" />
       <DesignsBreakdownDialog open={showDesignsBreakdown} onOpenChange={setShowDesignsBreakdown} orders={orders} />
     </div>
   )

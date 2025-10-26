@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-
+import Image from "next/image"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -18,7 +18,6 @@ export default function LoginDialog({ onLogin }: LoginDialogProps) {
   const [error, setError] = useState("")
 
   const handleLogin = () => {
-    // Simple validation - one account only
     if (username === "Maynard" && password === "benzaralihd1st") {
       const token = generateToken(username)
       localStorage.setItem("authToken", token)
@@ -38,8 +37,19 @@ export default function LoginDialog({ onLogin }: LoginDialogProps) {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <Card className="w-full max-w-md p-8 shadow-lg">
+        {/* Header with logo + title */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">The Undergrads</h1>
+          <div className="flex items-center justify-center gap-3 mb-2">
+            <Image
+              src="/placeholder-logo.png" // your logo file inside /public
+              alt="The Undergrads Logo"
+              width={48}
+              height={48}
+              className="rounded-full"
+              priority
+            />
+            <h1 className="text-3xl font-bold text-gray-900">The Undergrads</h1>
+          </div>
           <p className="text-gray-600">Order Management System</p>
         </div>
 

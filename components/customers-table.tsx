@@ -11,6 +11,7 @@ interface Order {
 }
 
 interface Customer {
+  id: string
   name: string
   facebook: string
   phone: string
@@ -25,7 +26,7 @@ interface CustomersTableProps {
   totalPages: number
   totalItems: number
   onPageChange: (page: number) => void
-  onViewOrder: (customerName: string) => void
+  onViewOrder: (customerId: string) => void
   defectiveItems: any[]
 }
 
@@ -59,7 +60,7 @@ export default function CustomersTable({
               </tr>
             ) : (
               customers.map((customer) => (
-                <tr key={customer.name} className="border-b border-gray-200 hover:bg-gray-50">
+                <tr key={customer.id} className="border-b border-gray-200 hover:bg-gray-50">
                   <td className="px-2 sm:px-4 py-2 sm:py-3">
                     <div className="font-medium text-xs sm:text-sm">{customer.name}</div>
                     <div className="text-xs text-gray-500">{customer.chapter}</div>
@@ -72,7 +73,7 @@ export default function CustomersTable({
                   </td>
                   <td className="px-2 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium">{customer.orders.length}</td>
                   <td className="px-2 sm:px-4 py-2 sm:py-3 text-center">
-                    <Button onClick={() => onViewOrder(customer.name)} size="sm" variant="outline" className="text-xs">
+                    <Button onClick={() => onViewOrder(customer.id)} size="sm" variant="outline" className="text-xs">
                       View
                     </Button>
                   </td>
