@@ -54,7 +54,7 @@ export default function Header({
           <img
             src="/logo.png"
             alt="Logo"
-            className="h-20 w-20 sm:h-14 sm:w-14 object-contain"
+            className="h-30 w-30 sm:h-20 sm:w-20 object-contain"
           />
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
             TheUndergrads
