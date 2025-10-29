@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button"
 
 export interface Order {
-  id?: number
+  id: number
   name: string
   phone?: string
   facebook?: string
@@ -12,10 +12,14 @@ export interface Order {
   color: string
   size: string
   design: string
+  qty?: number
+  price: number
+ payment_status: "pending" | "partially paid" | "fully paid" // add this
+  created_at?: string
   isDefective?: boolean
   defectiveNote?: string
-  defectiveDate?: string
 }
+
 
 interface TrashDialogProps {
   open: boolean

@@ -1,7 +1,25 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { PlusCircle, Palette, Layers, Trash2, LogOut, FileDown } from "lucide-react"
+import {
+  PlusCircle,
+  Palette,
+  Layers,
+  Trash2,
+  LogOut,
+  Download,
+  Menu,
+  FileDown,
+} from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuGroup,
+} from "@/components/ui/dropdown-menu"
 
 interface HeaderProps {
   onAddOrder: () => void
@@ -10,7 +28,10 @@ interface HeaderProps {
   onDeleteAll: () => void
   onViewTrash: () => void
   onLogout: () => void
-  onExportPDF?: () => void
+  onExportTotalPDF: () => void
+  onExportByDesignPDF: () => void
+  onExportOrdersPDF: () => void
+  onExportShippingInfo: () => void
 }
 
 export default function Header({
@@ -20,19 +41,29 @@ export default function Header({
   onDeleteAll,
   onViewTrash,
   onLogout,
-  onExportPDF,
+  onExportTotalPDF,
+  onExportByDesignPDF,
+  onExportOrdersPDF,
+  onExportShippingInfo,
 }: HeaderProps) {
   return (
     <header className="bg-white border-b border-gray-200 shadow-sm">
       <div className="container mx-auto px-3 sm:px-4 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-        {/* Logo + Title */}
+        {/* ✅ Logo + Title */}
         <div className="flex items-center gap-3 sm:gap-4">
-          <img src="/logo.png" alt="Logo" className="h-10 w-10 sm:h-14 sm:w-14 object-contain" />
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">The Undergrads</h1>
+          <img
+            src="/logo.png"
+            alt="Logo"
+            className="h-20 w-20 sm:h-14 sm:w-14 object-contain"
+          />
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+            TheUndergrads
+          </h1>
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex flex-wrap justify-end gap-2 sm:gap-3 w-full sm:w-auto">
+        {/* ✅ Main Actions */}
+        <div className="flex items-center gap-3">
+          {/* Keep Add Order separate */}
           <Button
             onClick={onAddOrder}
             size="sm"
@@ -42,52 +73,75 @@ export default function Header({
             Add Order
           </Button>
 
-          <Button
-            onClick={onAddDesign}
-            size="sm"
-            className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs sm:text-sm flex items-center gap-1"
-          >
-            <Layers className="w-4 h-4" />
-            Add Design
-          </Button>
+          {/* Dropdown for grouped actions */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-1 text-xs sm:text-sm"
+              >
+                <Menu className="w-4 h-4" /> More Actions
+              </Button>
+            </DropdownMenuTrigger>
 
-          <Button
-            onClick={onAddColor}
-            size="sm"
-            className="bg-green-600 hover:bg-green-700 text-white text-xs sm:text-sm flex items-center gap-1"
-          >
-            <Palette className="w-4 h-4" />
-            Add Color
-          </Button>
+            <DropdownMenuContent align="end" className="w-56">
+              {/* --- Export Group --- */}
+              <DropdownMenuLabel>📦 Export</DropdownMenuLabel>
+              <DropdownMenuGroup>
+                <DropdownMenuItem onClick={onExportShippingInfo}>
+                  <Download className="mr-2 h-4 w-4 text-green-600" />
+                  Export Shipping Info
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onExportTotalPDF}>
+                  <FileDown className="mr-2 h-4 w-4 text-green-600" />
+                  Export Total T-Shirts
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onExportByDesignPDF}>
+                  <FileDown className="mr-2 h-4 w-4 text-green-600" />
+                  Export By Design
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onExportOrdersPDF}>
+                  <FileDown className="mr-2 h-4 w-4 text-green-600" />
+                  Export Orders Report
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
 
-          <Button
-            onClick={onViewTrash}
-            variant="outline"
-            size="sm"
-            className="text-xs sm:text-sm flex items-center gap-1 border-gray-300 text-gray-700 hover:bg-gray-100"
-          >
-            <Trash2 className="w-4 h-4" />
-            Trash
-          </Button>
+              <DropdownMenuSeparator />
 
-          <Button
-            onClick={onDeleteAll}
-            size="sm"
-            className="bg-red-600 hover:bg-red-700 text-white text-xs sm:text-sm flex items-center gap-1"
-          >
-            <Trash2 className="w-4 h-4" />
-            Delete All
-          </Button>
+              {/* --- Manage Group --- */}
+              <DropdownMenuLabel>🎨 Manage</DropdownMenuLabel>
+              <DropdownMenuGroup>
+                <DropdownMenuItem onClick={onAddDesign}>
+                  <Layers className="mr-2 h-4 w-4 text-indigo-600" />
+                  Add Design
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onAddColor}>
+                  <Palette className="mr-2 h-4 w-4 text-green-600" />
+                  Add Color
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onViewTrash}>
+                  <Trash2 className="mr-2 h-4 w-4 text-gray-600" />
+                  View Trash
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={onDeleteAll}>
+                  <Trash2 className="mr-2 h-4 w-4 text-red-600" />
+                  Delete All
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
 
-          <Button
-            onClick={onLogout}
-            variant="outline"
-            size="sm"
-            className="text-xs sm:text-sm flex items-center gap-1 border-red-200 text-red-600 hover:bg-red-50"
-          >
-            <LogOut className="w-4 h-4" />
-            Logout
-          </Button>
+              <DropdownMenuSeparator />
+
+              {/* --- System Group --- */}
+              <DropdownMenuLabel>⚙️ System</DropdownMenuLabel>
+              <DropdownMenuGroup>
+                <DropdownMenuItem onClick={onLogout}>
+                  <LogOut className="mr-2 h-4 w-4 text-red-600" />
+                  Logout
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
     </header>

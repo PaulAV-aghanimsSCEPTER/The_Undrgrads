@@ -61,11 +61,12 @@ export default function FilterSection({
             className="w-full px-2 sm:px-3 py-2 border border-gray-300 rounded-md text-xs sm:text-sm"
           >
             <option>All</option>
-            {colors.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
+            {[...new Set(colors)].map((c) => (
+  <option key={c} value={c}>
+    {c}
+  </option>
+))}
+
           </select>
         </div>
         <div>
