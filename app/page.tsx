@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClient } from "@supabase/supabase-js"
+import { supabase } from "@/lib/supabase"
 import { isTokenValid } from "@/lib/jwt"
 import LoginDialog from "@/components/login-dialog"
 import Header from "@/components/header"
@@ -21,15 +21,6 @@ import autoTable from "jspdf-autotable"
 import { toast } from "@/components/ui/use-toast"
 
 
-
-
-
-
-// ✅ Supabase Client
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
 
 export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
