@@ -15,6 +15,7 @@ import ViewOrderDialog from "@/components/view-order-dialog"
 import TrashDialog, { type Order } from "@/components/trash-dialog"
 import TShirtsBreakdownDialog from "@/components/tshirts-breakdown-dialog"
 import DesignsBreakdownDialog from "@/components/designs-breakdown-dialog"
+import DefectiveItemsDialog from "@/components/defective-items-dialog"
 import { useRouter } from "next/navigation"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
@@ -27,9 +28,11 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
   
+  
 
   // --- Data ---
   const [orders, setOrders] = useState<Order[]>([])
+  const [isTrashOpen, setIsTrashOpen] = useState(false)
   const [trashOrders, setTrashOrders] = useState<Order[]>([])
   const [defectiveOrders, setDefectiveOrders] = useState<Order[]>([])
 
@@ -43,13 +46,16 @@ export default function Home() {
   const [filterSize, setFilterSize] = useState("All")
   const [filterDesign, setFilterDesign] = useState("All")
   const [currentPage, setCurrentPage] = useState(1)
+  
 
   const [showAddOrderDialog, setShowAddOrderDialog] = useState(false)
   const [showAddDesignDialog, setShowAddDesignDialog] = useState(false)
   const [showAddColorDialog, setShowAddColorDialog] = useState(false)
   const [showViewOrderDialog, setShowViewOrderDialog] = useState(false)
   const [showTrashDialog, setShowTrashDialog] = useState(false)
+  const [showDefectiveDialog, setShowDefectiveDialog] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState<string | null>(null)
+  
 
   const [showTShirtsBreakdown, setShowTShirtsBreakdown] = useState(false)
   const [showDesignsBreakdown, setShowDesignsBreakdown] = useState(false)
@@ -62,8 +68,23 @@ export default function Home() {
     if (token && isTokenValid(token)) setIsAuthenticated(true)
     setIsLoading(false)
   }, [])
+  
+
+// ✅ Defective items
+const fetchDefectiveOrders = async () => {
+  const { data, error } = await supabase
+    .from("orders")
+    .select("*")
+    .eq("is_defective", true)
+    .order("id", { ascending: false })
+
+  if (error) console.error("❌ Error fetching defective items:", error)
+  else setDefectiveOrders(data || [])
+}
 
 
+
+  
 
 // ✅ Export Orders to PDF
 // ✅ 1. Export: Total T-Shirts Summary (with aligned Size + Color)
@@ -321,33 +342,27 @@ const fetchOrders = async () => {
     .from("orders")
     .select("*")
     .eq("is_deleted", false)
+    .eq("is_defective", false)
     .order("id", { ascending: false })
 
-  if (error) {
-    console.error("❌ Error fetching orders:", error)
-  } else {
-    setOrders(data || [])
-  }
+  if (error) console.error("❌ Error fetching orders:", error)
+  else setOrders(data || [])
 }
 
 
   // ✅ Fetch Trash
 const fetchTrashOrders = async () => {
   const { data, error } = await supabase
-    .from("orders")
+    .from("trash_orders")
     .select("*")
-    .eq("is_deleted", true)
     .order("deleted_at", { ascending: false })
 
   if (error) {
-    console.error("❌ Error fetching trash:", error)
+    console.error("❌ Error fetching trash_orders:", error)
   } else {
-    console.log("🗑️ Trash fetched:", data)
     setTrashOrders(data || [])
   }
 }
-
-
 
 
   // ✅ Fetch Designs and Colors from Supabase
@@ -359,20 +374,25 @@ const fetchTrashOrders = async () => {
   }
 
   // ✅ Initial Fetch
-  useEffect(() => {
-     fetchOrders()
+useEffect(() => {
+  fetchOrders()
+  fetchDefectiveOrders()
   fetchTrashOrders()
-    fetchDesignsAndColors()
+  fetchDesignsAndColors()
 
-    const channel = supabase
-      .channel("orders-changes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => fetchOrders())
-      .subscribe()
+  const channel = supabase
+    .channel("orders-changes")
+    .on("postgres_changes", { event: "*", schema: "public", table: "orders" }, () => {
+      fetchOrders()
+      fetchDefectiveOrders()
+    })
+    .subscribe()
 
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [])
+  return () => {
+    supabase.removeChannel(channel)
+  }
+}, [])
+
 
   const handleLogout = () => {
     localStorage.removeItem("authToken")
@@ -427,53 +447,57 @@ const fetchTrashOrders = async () => {
     : null
 
   // ✅ Delete a single order → Move to Trash
-const handleDeleteOrder = async (order: Order) => {
-  if (!order.id) return
+ const handleDeleteOrder = (orderId: number) => {
+    const orderToTrash = orders.find(o => o.id === orderId)
+    if (orderToTrash) {
+      setOrders(prev => prev.filter(o => o.id !== orderId))
+      setTrashOrders(prev => [...prev, orderToTrash])
+    }
+  }
 
-  const orderId = Number(order.id)
-  console.log("🗑 Attempting to delete:", orderId, typeof orderId)
-
-  const { data, error } = await supabase
-    .from("orders")
-    .update({
-      is_deleted: true,
-      deleted_at: new Date().toISOString(),
-    })
-    .eq("id", orderId)
-    .select()
-
-  console.log("✅ Supabase response:", { data, error })
-
-  if (error) {
-    console.error("❌ Supabase error:", error)
-  } else if (data.length === 0) {
-    console.warn("⚠️ No rows updated — check if ID exists or is correct")
-  } else {
-    toast({ title: "Moved to Trash" })
-    await fetchOrders()
-    await fetchTrashOrders()
+// Retrieve single order
+const handleRetrieveOrder = (orderId: number) => {
+  const orderToRestore = trashOrders.find((order) => order.id === orderId)
+  if (orderToRestore) {
+    setTrashOrders((prev) => prev.filter((order) => order.id !== orderId))
+    setOrders((prev) => [...prev, orderToRestore])
   }
 }
 
- const handleMarkDefective = async (orderId: number, note: string) => {
-    const { data, error } = await supabase
-      .from("orders")
-      .update({ is_defective: true, defective_note: note })
-      .eq("id", orderId)
+// Permanently delete single order
+const handleDeleteOrderPermanently = (orderId: number) => {
+  setTrashOrders((prev) => prev.filter((order) => order.id !== orderId))
+}
 
-    if (error) {
-      console.error("Failed to mark defective:", error)
-      toast({ title: "Error", description: error.message, variant: "destructive" })
-      return
-    }
+// Retrieve all
+const handleRetrieveAll = () => {
+  setOrders((prev) => [...prev, ...trashOrders])
+  setTrashOrders([])
+}
 
-    setDefectiveOrders((prev) =>
-      prev.map((o) => (o.id === orderId ? { ...o, isDefective: true, defectiveNote: note } : o))
-    )
+// Delete all permanently
+const handleDeleteAllPermanently = () => {
+  setTrashOrders([])
+}
 
-    toast({ title: "Marked as defective" })
-    await fetchOrders()
+
+const handleMarkDefective = async (orderId: number, note: string = "") => {
+  const { error } = await supabase
+    .from("orders")
+    .update({ is_defective: true, defective_note: note })
+    .eq("id", orderId)
+
+  if (error) {
+    console.error("❌ Failed to mark defective:", error)
+    return
   }
+
+  await fetchOrders()
+  await fetchDefectiveOrders()
+  alert("✅ Order marked as defective!")
+}
+
+
 
 
 
@@ -488,32 +512,63 @@ const handleDeleteOrder = async (order: Order) => {
   }
 
   // ✅ Delete All → Move to Trash
-  const handleDeleteAll = async () => {
-    if (!confirm("Are you sure you want to delete all orders?")) return
-    try {
-      const { data: allOrders } = await supabase.from("orders").select("*")
-      if (!allOrders || allOrders.length === 0) {
-        alert("No orders to delete.")
-        return
-      }
+ // ✅ Delete All → Move to Trash (fixed)
+const handleDeleteAll = async () => {
+  if (!confirm("Are you sure you want to delete all orders?")) return
 
-      const { error: moveError } = await supabase.from("trash_orders").insert(
-        allOrders.map((o) => ({
-          ...o,
-          deleted_at: new Date(),
-        }))
-      )
-      if (moveError) throw moveError
+  try {
+    // 1️⃣ Get all current orders
+    const { data: allOrders, error: fetchError } = await supabase
+      .from("orders")
+      .select("*")
 
-      await supabase.from("orders").delete().neq("id", 0)
-      await fetchOrders()
-      await fetchTrashOrders()
-      alert("All orders moved to Trash.")
-    } catch (err: any) {
-      console.error("❌ Error moving to trash:", err.message)
-      alert("Failed to delete all orders.")
+    if (fetchError) throw fetchError
+    if (!allOrders || allOrders.length === 0) {
+      alert("No orders to delete.")
+      return
     }
+
+    // 2️⃣ Move them to trash_orders (excluding id)
+    const { error: moveError } = await supabase.from("trash_orders").insert(
+      allOrders.map((o) => ({
+        name: o.name,
+        phone: o.phone,
+        facebook: o.facebook,
+        chapter: o.chapter,
+        address: o.address,
+        color: o.color,
+        size: o.size,
+        design: o.design,
+        price: o.price,
+        note: o.note,
+        status: o.status,
+        payment_status: o.payment_status,
+        defective_note: o.defective_note,
+        is_defective: o.is_defective,
+        is_deleted: true,
+        is_trashed: true,
+        deleted_at: new Date(),
+        created_at: o.created_at,
+      }))
+    )
+
+    if (moveError) throw moveError
+
+    // 3️⃣ Delete all from orders
+    const { error: deleteError } = await supabase.from("orders").delete().neq("id", 0)
+    if (deleteError) throw deleteError
+
+    // 4️⃣ Refresh data
+    await fetchOrders()
+    await fetchTrashOrders()
+
+    alert("✅ All orders moved to Trash successfully!")
+  } catch (err: any) {
+    console.error("❌ Error moving to trash:", err.message)
+    alert("Failed to delete all orders.")
   }
+}
+
 
   // --- Render ---
   return (
@@ -523,7 +578,7 @@ const handleDeleteOrder = async (order: Order) => {
   onAddDesign={() => setShowAddDesignDialog(true)}
   onAddColor={() => setShowAddColorDialog(true)}
   onDeleteAll={handleDeleteAll}
-  onViewTrash={() => setShowTrashDialog(true)}
+  onViewTrash={() => setIsTrashOpen(true)} 
   onLogout={handleLogout}
   onExportTotalPDF={handleExportTotalPDF}     // ✅ now correct
   onExportByDesignPDF={handleExportByDesignPDF} // ✅ now correct
@@ -583,6 +638,18 @@ const handleDeleteOrder = async (order: Order) => {
   }}
 />
 
+{/* ✅ View Defective Items Button */}
+<div className="flex justify-end mb-4">
+  <button
+    className="bg-yellow-500 hover:bg-yellow-600 text-white px-4 py-2 rounded-lg shadow-md transition flex items-center gap-2"
+    onClick={() => setShowDefectiveDialog(true)}
+  >
+    🧩 Defective Items
+    <span className="bg-white text-yellow-700 font-bold rounded-full px-2 py-0.5 text-sm">
+      {defectiveOrders.length}
+    </span>
+  </button>
+</div>
 
 
         <FilterSection
@@ -635,47 +702,173 @@ const handleDeleteOrder = async (order: Order) => {
   colors={colors}
   designs={designs}
   onAddMoreOrder={() => setShowAddOrderDialog(true)}
-  onDeleteOrder={(orderId) => {
-    const order = selectedCustomerObj?.orders.find((o) => o.id === orderId)
-    if (order) handleDeleteOrder(order)
-    else console.error("❌ Could not find order with ID:", orderId)
-  }}
+onDeleteOrder={handleDeleteOrder}
   onEditOrder={() => {}}
   onMarkDefective={(orderId, note) => handleMarkDefective(orderId, note || "")}
   onEditCustomer={() => {}}
 />
 
 
-
-
       {/* ✅ Trash Dialogs */}
+{/* ✅ Trash Dialogs */}
 <TrashDialog
-  open={showTrashDialog}
-  onOpenChange={setShowTrashDialog}
+  open={isTrashOpen}
+  onOpenChange={setIsTrashOpen}
+  
   trashOrders={trashOrders}
-  onRetrieveOrder={async (id) => {
-    await supabase
-      .from("orders")
-      .update({ is_deleted: false, deleted_at: null })
-      .eq("id", id)
-    await fetchOrders()
-    await fetchTrashOrders()
+  onRetrieveOrder={async (orderId) => {
+    try {
+      // Get the order from trash
+      const { data: orderToRestore, error: fetchError } = await supabase
+        .from("trash_orders")
+        .select("*")
+        .eq("id", orderId)
+        .single()
+
+      if (fetchError) throw fetchError
+      if (!orderToRestore) {
+        alert("Order not found in trash.")
+        return
+      }
+
+      // Move back to orders table
+      const { error: insertError } = await supabase.from("orders").insert([
+        {
+          name: orderToRestore.name,
+          phone: orderToRestore.phone,
+          facebook: orderToRestore.facebook,
+          chapter: orderToRestore.chapter,
+          address: orderToRestore.address,
+          color: orderToRestore.color,
+          size: orderToRestore.size,
+          design: orderToRestore.design,
+          price: orderToRestore.price,
+          is_defective: orderToRestore.is_defective,
+          defective_note: orderToRestore.defective_note,
+          payment_status: orderToRestore.payment_status,
+          created_at: new Date(), // set new timestamp
+        },
+      ])
+
+      if (insertError) throw insertError
+
+      // Remove it from trash_orders
+      const { error: deleteError } = await supabase
+        .from("trash_orders")
+        .delete()
+        .eq("id", orderId)
+      if (deleteError) throw deleteError
+
+      await fetchOrders()
+      await fetchTrashOrders()
+      alert("✅ Order successfully retrieved!")
+    } catch (err: any) {
+      console.error("❌ Error retrieving order:", err.message)
+      alert("Failed to retrieve order.")
+    }
   }}
   onRetrieveAll={async () => {
-    await supabase
-      .from("orders")
-      .update({ is_deleted: false, deleted_at: null })
-      .neq("id", 0)
-    await fetchOrders()
-    await fetchTrashOrders()
+    try {
+      // Get all trash orders
+      const { data: trashData, error: fetchError } = await supabase
+        .from("trash_orders")
+        .select("*")
+
+      if (fetchError) throw fetchError
+      if (!trashData || trashData.length === 0) {
+        alert("Trash is empty.")
+        return
+      }
+
+      // Move all to orders
+      const formatted = trashData.map((o) => ({
+        name: o.name,
+        phone: o.phone,
+        facebook: o.facebook,
+        chapter: o.chapter,
+        address: o.address,
+        color: o.color,
+        size: o.size,
+        design: o.design,
+        price: o.price,
+        is_defective: o.is_defective,
+        defective_note: o.defective_note,
+        payment_status: o.payment_status,
+        created_at: new Date(),
+      }))
+
+      const { error: insertError } = await supabase.from("orders").insert(formatted)
+      if (insertError) throw insertError
+
+      // Delete all from trash_orders
+      const { error: deleteError } = await supabase.from("trash_orders").delete().neq("id", 0)
+      if (deleteError) throw deleteError
+
+      await fetchOrders()
+      await fetchTrashOrders()
+      alert("✅ All orders retrieved successfully!")
+    } catch (err: any) {
+      console.error("❌ Error retrieving all orders:", err.message)
+      alert("Failed to retrieve all orders.")
+    }
   }}
-  onDeleteOrderPermanently={async (id) => {
-    await supabase.from("orders").delete().eq("id", id)
-    await fetchTrashOrders()
+  onDeleteOrderPermanently={async (orderId) => {
+    try {
+      const { error } = await supabase.from("trash_orders").delete().eq("id", orderId)
+      if (error) throw error
+
+      await fetchTrashOrders()
+      alert("🗑️ Order permanently deleted.")
+    } catch (err: any) {
+      console.error("❌ Error deleting order permanently:", err.message)
+      alert("Failed to delete order permanently.")
+    }
   }}
   onDeleteAllPermanently={async () => {
-    await supabase.from("orders").delete().eq("is_deleted", true)
-    await fetchTrashOrders()
+    try {
+      const { error } = await supabase.from("trash_orders").delete().neq("id", 0)
+      if (error) throw error
+
+      await fetchTrashOrders()
+      alert("🗑️ All trash orders deleted permanently.")
+    } catch (err: any) {
+      console.error("❌ Error deleting all trash:", err.message)
+      alert("Failed to delete all trash.")
+    }
+  }}
+/>
+
+
+
+
+
+   {/* ✅ Defective Items Dialog */}
+      <DefectiveItemsDialog
+  open={showDefectiveDialog}
+  onOpenChange={setShowDefectiveDialog}
+  defectiveOrders={defectiveOrders}
+onRetrieveDefective={async (id: number) => {
+  await supabase
+    .from("orders")
+    .update({ is_defective: false, defective_note: "" })
+    .eq("id", id)
+
+  await fetchOrders()
+  await fetchDefectiveOrders()
+  alert("✅ Order restored to normal list!")
+}}
+
+
+onDeleteDefectivePermanently={async (id: number) => {
+  await supabase.from("orders").delete().eq("id", id)
+  await fetchDefectiveOrders()
+  alert("🗑️ Order permanently deleted.")
+}}
+
+  onDeleteAllDefectivePermanently={async () => {
+    await supabase.from("orders").delete().eq("is_defective", true)
+    await fetchDefectiveOrders()
+    alert("🗑️ All defective orders deleted.")
   }}
 />
 
