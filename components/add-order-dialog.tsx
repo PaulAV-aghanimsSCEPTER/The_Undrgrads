@@ -91,62 +91,63 @@ export default function AddOrderDialog({
     })
   }
 
-  const handleSubmitAll = async () => {
-    if (ordersToAdd.length === 0) {
-      alert("Please add at least one order")
+const handleSubmitAll = async () => {
+  if (ordersToAdd.length === 0) {
+    alert("Please add at least one order")
+    return
+  }
+
+  try {
+    const formattedOrders = ordersToAdd.map((order) => ({
+      name: formData.name,
+      phone: formData.phone,
+      facebook: formData.facebook,
+      chapter: formData.chapter,
+      address: formData.address,
+      color: order.color,
+      size: order.size,
+      design: order.design,
+      note: "",
+      payment_status: order.paymentStatus || "pending", // ✅ FIXED: Correct column name
+      price: order.price || 0,
+      created_at: new Date(),
+    }))
+
+    const { data, error } = await supabase.from("orders").insert(formattedOrders).select()
+    if (error) {
+      console.error("❌ Error saving orders:", error.message)
+      alert("Failed to save orders.")
       return
     }
 
-    try {
-      const formattedOrders = ordersToAdd.map((order) => ({
-        name: formData.name,
-        phone: formData.phone,
-        facebook: formData.facebook,
-        chapter: formData.chapter,
-        address: formData.address,
-        color: order.color,
-        size: order.size,
-        design: order.design,
-        note: "",
-        status: order.paymentStatus || "Pending",
-        price: order.price || 0,
-        created_at: new Date(),
-      }))
+    console.log("✅ Saved to Supabase:", data)
+    alert("Orders successfully saved to Supabase!")
 
-      const { data, error } = await supabase.from("orders").insert(formattedOrders).select()
-      if (error) {
-        console.error("❌ Error saving orders:", error.message)
-        alert("Failed to save orders.")
-        return
-      }
-
-      console.log("✅ Saved to Supabase:", data)
-      alert("Orders successfully saved to Supabase!")
-
-      if (data && Array.isArray(data)) {
-        data.forEach((order) => onAddOrder(order))
-      }
-
-      // Reset after saving
-      setFormData({
-        name: "",
-        phone: "",
-        facebook: "",
-        chapter: "",
-        address: "",
-        color: colors[0] || "",
-        size: "M",
-        design: availableDesigns[0] || "",
-        paymentStatus: "pending",
-        price: "",
-      })
-      setOrdersToAdd([])
-      onOpenChange(false)
-    } catch (err) {
-      console.error("Unexpected error:", err)
-      alert("Something went wrong while saving.")
+    if (data && Array.isArray(data)) {
+      data.forEach((order) => onAddOrder(order))
     }
+
+    // Reset after saving
+    setFormData({
+      name: "",
+      phone: "",
+      facebook: "",
+      chapter: "",
+      address: "",
+      color: colors[0] || "White",
+      size: "M",
+      design: availableDesigns[0] || "",
+      paymentStatus: "pending",
+      price: "",
+    })
+    setOrdersToAdd([])
+    onOpenChange(false)
+  } catch (err) {
+    console.error("Unexpected error:", err)
+    alert("Something went wrong while saving.")
   }
+}
+
 
   const handleRemoveOrder = (index: number) => {
     setOrdersToAdd((prevOrders) => prevOrders.filter((_, i) => i !== index))
@@ -339,7 +340,7 @@ export default function AddOrderDialog({
                   color: colors[0] || "",
                   size: "M",
                   design: availableDesigns[0] || "",
-                  paymentStatus: "pending",
+                  paymentStatus: "",
                   price: "",
                 })
               }}

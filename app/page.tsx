@@ -19,6 +19,7 @@ import DefectiveItemsDialog from "@/components/defective-items-dialog"
 import { useRouter } from "next/navigation"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
+import ColorByDesignChart from "@/components/ColorByDesignChart"
 import { toast } from "@/components/ui/use-toast"
 
 
@@ -82,7 +83,35 @@ const fetchDefectiveOrders = async () => {
   else setDefectiveOrders(data || [])
 }
 
+const handleEditDefectiveNote = async (id: number, newNote: string) => {
+  try {
+    const { error } = await supabase
+      .from("orders") // or "defective_orders" depending on your table name
+      .update({ defective_note: newNote })
+      .eq("id", id)
 
+    if (error) throw error
+
+    // 🧠 Update UI instantly
+    setDefectiveOrders((prev: any[]) =>
+      prev.map((order) =>
+        order.id === id ? { ...order, defective_note: newNote } : order
+      )
+    )
+
+    toast({
+      title: "✅ Note updated successfully!",
+      description: "The defective note has been saved.",
+    })
+  } catch (err: any) {
+    console.error("❌ Error updating defective note:", err.message)
+    toast({
+      title: "Error updating note",
+      description: err.message,
+      variant: "destructive",
+    })
+  }
+}
 
   
 
@@ -236,36 +265,36 @@ const handleExportOrdersPDF = () => {
   doc.setFontSize(14)
   doc.text("Customers Orders", 14, 15)
 
-  // Group by customer name
+  // Group by unique customer identity (name + phone + address)
   const grouped: Record<string, any[]> = {}
   orders.forEach((o) => {
-    const name = o.name || "Unknown Customer"
-    if (!grouped[name]) grouped[name] = []
-    grouped[name].push(o)
+    const key = `${o.name || "Unknown"}|${o.phone || "NoPhone"}|${o.address || "NoAddress"}`
+    if (!grouped[key]) grouped[key] = []
+    grouped[key].push(o)
   })
 
   let startY = 25
 
-  Object.entries(grouped).forEach(([customer, items]) => {
-    // Green customer header bar
+  Object.entries(grouped).forEach(([key, items]) => {
+    const [name, phone, address] = key.split("|")
+
+    // Green header bar
     doc.setFillColor(90, 180, 50)
     doc.rect(10, startY - 4, 190, 8, "F")
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(11)
-    doc.text(`Customer: ${customer}`, 14, startY + 2)
+    doc.text(`Customer: ${name}`, 14, startY + 2)
     doc.setTextColor(0, 0, 0)
-
     startY += 8
 
+    // Customer orders
     const tableData = items.map((o) => [
       o.design || "",
       o.color || "",
       o.size || "",
       o.quantity || 1,
       o.price ? `php = ${o.price}` : "php = 0",
-      o.created_at
-        ? new Date(o.created_at).toLocaleDateString()
-        : "",
+      o.created_at ? new Date(o.created_at).toLocaleDateString() : "",
     ])
 
     autoTable(doc, {
@@ -285,6 +314,7 @@ const handleExportOrdersPDF = () => {
   doc.save("Customers_Orders.pdf")
 }
 
+
 const handleExportShippingInfo = () => {
   if (!orders.length) {
     alert("No shipping information to export.")
@@ -301,25 +331,22 @@ const handleExportShippingInfo = () => {
   > = {}
 
   orders.forEach((o) => {
-    const name = o.name || "Unknown Customer"
-    if (!groupedCustomers[name]) {
-      groupedCustomers[name] = {
+    const key = `${o.name || "Unknown"}|${o.phone || "NoPhone"}|${o.address || "NoAddress"}`
+    if (!groupedCustomers[key]) {
+      groupedCustomers[key] = {
         address: o.address || "N/A",
         phone: o.phone || "N/A",
         totalOrder: 0,
       }
     }
-    groupedCustomers[name].totalOrder++
+    groupedCustomers[key].totalOrder++
   })
 
-  const tableData = Object.entries(groupedCustomers).map(([name, info]) => [
-    name,
-    info.address,
-    info.totalOrder,
-    info.phone,
-  ])
+  const tableData = Object.entries(groupedCustomers).map(([key, info]) => {
+    const [name] = key.split("|")
+    return [name, info.address, info.totalOrder, info.phone]
+  })
 
-  // ✅ Correct function call
   autoTable(doc, {
     head: [["Name", "Address", "Total Order", "Phone"]],
     body: tableData,
@@ -846,6 +873,7 @@ onDeleteOrder={handleDeleteOrder}
       <DefectiveItemsDialog
   open={showDefectiveDialog}
   onOpenChange={setShowDefectiveDialog}
+  onEditDefectiveNote={handleEditDefectiveNote}
   defectiveOrders={defectiveOrders}
 onRetrieveDefective={async (id: number) => {
   await supabase
@@ -872,7 +900,7 @@ onDeleteDefectivePermanently={async (id: number) => {
   }}
 />
 
-
+<ColorByDesignChart />  
 
       <TShirtsBreakdownDialog
        open={showTShirtsBreakdown}

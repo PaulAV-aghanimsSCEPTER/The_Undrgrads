@@ -67,9 +67,9 @@ export default function ViewOrderDialog({
   })
 
   const [newOrder, setNewOrder] = useState({
-    color: colors[0] || "",
+    color: colors[0] || "White",
     size: "M",
-    design: designs[0] || "",
+    design: designs[0] || "Prologue",
     paymentStatus: "Pending",
     price: "",
   })
@@ -103,41 +103,55 @@ export default function ViewOrderDialog({
     }
   }
 
-  // ✅ Add More Order
-  const handleAddOrder = async () => {
-    const orderToAdd: Order = {
-      id: Date.now(),
-      ...customerData,
+// ✅ Add More Order (Fixed)
+const handleAddOrder = async () => {
+  const normalizedStatus =
+    newOrder.paymentStatus.toLowerCase() as "pending" | "partially paid" | "fully paid"
+
+  const orderToAdd: Order = {
+    id: Date.now(),
+    ...customerData,
+    color: newOrder.color,
+    size: newOrder.size,
+    design: newOrder.design,
+    payment_status: normalizedStatus,
+    price: Number(newOrder.price) || 0,
+    is_defective: false,
+    defective_note: "",
+  }
+
+  // ✅ Insert to Supabase correctly
+  const { error } = await supabase.from("orders").insert([
+    {
+      name: customerData.name,
+      phone: customerData.phone,
+      facebook: customerData.facebook,
+      chapter: customerData.chapter,
+      address: customerData.address,
       color: newOrder.color,
       size: newOrder.size,
       design: newOrder.design,
-      payment_status:
-        newOrder.paymentStatus.toLowerCase() as "pending" | "partially paid" | "fully paid",
+      payment_status: normalizedStatus, // fixed here
       price: Number(newOrder.price) || 0,
-      is_defective: false,
-      defective_note: "",
-    }
+      created_at: new Date().toISOString(),
+    },
+  ])
 
-    const { error } = await supabase.from("orders").insert([
-      {
-        ...orderToAdd,
-        created_at: new Date().toISOString(),
-      },
-    ])
-
-    if (error) {
-      toast({
-        title: "Error adding order",
-        description: error.message,
-        variant: "destructive",
-      })
-      return
-    }
-
-    onAddMoreOrder(orderToAdd)
-    setShowAddMoreForm(false)
-    toast({ title: "Order added successfully!" })
+  if (error) {
+    toast({
+      title: "Error adding order",
+      description: error.message,
+      variant: "destructive",
+    })
+    return
   }
+
+  onAddMoreOrder(orderToAdd)
+  setShowAddMoreForm(false)
+  toast({ title: "✅ Order added successfully!" })
+}
+
+
 
   // ✅ Move to Trash
   const handleDeleteOrder = async (order: Order) => {
@@ -257,7 +271,26 @@ const handleMarkDefective = async (orderId: number) => {
               <div key={order.id} className="p-3 border rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white shadow-sm">
                 <div className="flex-1 text-sm text-gray-800">
                   <div><strong>{order.color}</strong> – {order.size} – {order.design}</div>
-                  <div>Status: {order.payment_status}</div>
+                  <div className="flex items-center gap-1">
+  <strong>Status:</strong>
+  <span
+    className={
+      order.payment_status === "fully paid"
+        ? "text-green-600 font-semibold"
+        : order.payment_status === "partially paid"
+        ? "text-yellow-600 font-semibold"
+        : "text-gray-600 font-semibold"
+    }
+  >
+    {order.payment_status
+      ? order.payment_status
+          .split(" ")
+          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+          .join(" ")
+      : "Pending"}
+  </span>
+</div>
+
                   <div>₱{order.price}</div>
                   {order.is_defective && <div className="text-red-600">⚠ Defective: {order.defective_note}</div>}
                 </div>

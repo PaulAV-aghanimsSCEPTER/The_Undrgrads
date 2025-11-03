@@ -7,6 +7,9 @@ import { Dialog, DialogContent, DialogTitle, DialogHeader } from "@/components/u
 interface Order {
   id?: number
   name: string
+  phone?: string
+  facebook?: string
+  address?: string
   color: string
   size: string
   design: string
@@ -18,32 +21,27 @@ interface Order {
 interface SummaryCardsProps {
   totalTShirts: number
   orders: Order[]
-  onCardClick: (type: "total" | "designs") => void // remove "customers"
+  onCardClick: (type: "total" | "designs") => void
   onDownload: (type: "total" | "byDesign" | "orders") => void
 }
-
 
 export default function SummaryCards({ totalTShirts, orders, onCardClick }: SummaryCardsProps) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [expandedCustomers, setExpandedCustomers] = useState<Record<string, boolean>>({})
 
-  const designsPerSizeColor = new Set(orders.map((o) => `${o.color}-${o.size}`)).size
-  const uniqueCustomers = Array.from(new Set(orders.map((o) => o.name))).filter(Boolean) as string[]
+  // ✅ Fix grouping to use full customer info (not just name)
+  const ordersPerCustomer = orders.reduce((acc, o) => {
+    const key = `${o.name}|${o.phone || ""}|${o.facebook || ""}|${o.address || ""}`
+    if (!acc[key]) acc[key] = []
+    acc[key].push(o)
+    return acc
+  }, {} as Record<string, Order[]>)
 
-  const ordersPerCustomer: Record<string, Order[]> = {}
-  orders.forEach((order) => {
-    if (order.name) {
-      if (!ordersPerCustomer[order.name]) ordersPerCustomer[order.name] = []
-      ordersPerCustomer[order.name].push(order)
-    }
-  })
+  const uniqueCustomersCount = Object.keys(ordersPerCustomer).length
+  const designsPerSizeColor = new Set(orders.map((o) => `${o.color}-${o.size}`)).size
 
   const cardClass =
     "p-6 sm:p-8 cursor-pointer transition-all hover:shadow-lg hover:scale-105 flex flex-col justify-center items-center text-center"
-
-  const toggleCustomer = (name: string) => {
-    setExpandedCustomers((prev) => ({ ...prev, [name]: !prev[name] }))
-  }
 
   return (
     <>
@@ -72,14 +70,14 @@ export default function SummaryCards({ totalTShirts, orders, onCardClick }: Summ
           onClick={() => setIsModalOpen(true)}
         >
           <div className="text-sm text-gray-600 mb-2">Total Customers</div>
-          <div className="text-3xl font-bold text-yellow-600">{uniqueCustomers.length}</div>
+          <div className="text-3xl font-bold text-yellow-600">{uniqueCustomersCount}</div>
           <div className="text-xs text-gray-500 mt-2">
-            Orders per Customer (avg): {(orders.length / uniqueCustomers.length || 0).toFixed(1)}
+            Orders per Customer (avg): {(orders.length / uniqueCustomersCount || 0).toFixed(1)}
           </div>
         </Card>
       </div>
 
-      {/* Customer Modal */}
+      {/* ✅ Customer Modal */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -87,30 +85,52 @@ export default function SummaryCards({ totalTShirts, orders, onCardClick }: Summ
           </DialogHeader>
 
           <div className="mt-2 space-y-2 max-h-[400px] overflow-y-auto">
-            {uniqueCustomers.map((customer) => (
-              <div key={customer} className="border rounded bg-gray-50">
-                {/* Customer header */}
-                <div
-                  className="flex justify-between items-center p-3 cursor-pointer"
-                  onClick={() => toggleCustomer(customer)}
-                >
-                  <span className="font-semibold text-gray-700">{customer}</span>
-                  <span>{expandedCustomers[customer] ? "-" : "+"}</span>
-                </div>
+            {Object.entries(ordersPerCustomer).map(([key, customerOrders]) => {
+              const [name, phone, facebook, address] = key.split("|")
+              const isExpanded = expandedCustomers[key]
 
-                {/* Orders list */}
-                {expandedCustomers[customer] && (
-                  <div className="px-3 pb-3 space-y-1">
-                    {ordersPerCustomer[customer].map((order, idx) => (
-                      <div key={idx} className="flex justify-between border-b py-1">
-                        <span>{order.design} ({order.color}-{order.size})</span>
-                        <span>{order.quantity || 1} pcs</span>
-                      </div>
-                    ))}
+              return (
+                <div
+                  key={key}
+                  className="border rounded bg-gray-50 hover:bg-gray-100 transition"
+                >
+                  {/* Header */}
+                  <div
+                    className="p-3 cursor-pointer"
+                    onClick={() =>
+                      setExpandedCustomers((prev) => ({
+                        ...prev,
+                        [key]: !prev[key],
+                      }))
+                    }
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="font-semibold text-gray-700">{name}</span>
+                      <span>{isExpanded ? "−" : "+"}</span>
+                    </div>
+                    <div className="text-xs text-gray-700 mt-1 bg-pink-100 rounded-md p-2">
+                      <p><strong>📞</strong> {phone || "No phone"}</p>
+                      <p><strong>📘</strong> {facebook || "No Facebook"}</p>
+                      <p><strong>📍</strong> {address || "No address"}</p>
+                    </div>
                   </div>
-                )}
-              </div>
-            ))}
+
+                  {/* Expanded Orders */}
+                  {isExpanded && (
+                    <div className="px-3 pb-3 space-y-1">
+                      {customerOrders.map((order, idx) => (
+                        <div key={idx} className="flex justify-between border-b py-1">
+                          <span>
+                            {order.design} ({order.color}-{order.size})
+                          </span>
+                          <span>{order.quantity || 1} pcs</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </DialogContent>
       </Dialog>
