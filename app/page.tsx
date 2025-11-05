@@ -432,40 +432,45 @@ useEffect(() => {
   if (!isAuthenticated) return <LoginDialog onLogin={handleLogin} />
 
   // --- Customer grouping ---
-  const uniqueCustomers = Array.from(
-    new Set(orders.map((o) => `${o.name}-${o.phone}-${o.facebook}-${o.address}`))
-  ).map((key) => {
-    const [name, phone, facebook, address] = key.split("-")
-    const customerOrders = orders.filter(
-      (o) =>
-        o.name === name &&
-        (o.phone || "") === phone &&
-        (o.facebook || "") === facebook &&
-        (o.address || "") === address
-    )
-    const customer = customerOrders[0]
-    return {
-      id: key,
-      name,
-      phone: customer?.phone || "",
-      facebook: customer?.facebook || "",
-      chapter: customer?.chapter || "",
-      address: customer?.address || "",
-      orders: customerOrders,
-    }
-  })
+const uniqueCustomers = Array.from(
+  new Set(orders.map((o) => `${o.name}-${o.phone}-${o.facebook}-${o.address}`))
+).map((key) => {
+  const [name, phone, facebook, address] = key.split("-")
+  const customerOrders = orders.filter(
+    (o) =>
+      o.name === name &&
+      (o.phone || "") === phone &&
+      (o.facebook || "") === facebook &&
+      (o.address || "") === address
+  )
+  const customer = customerOrders[0]
+  return {
+    id: key,
+    name,
+    phone: customer?.phone || "",
+    facebook: customer?.facebook || "",
+    chapter: customer?.chapter || "",
+    address: customer?.address || "",
+    orders: customerOrders,
+  }
+})
+
+// ✅ Sort customers alphabetically
+const sortedCustomers = [...uniqueCustomers].sort((a, b) =>
+  a.name.localeCompare(b.name)
+)
 
   // ✅ Filter Logic
-  const filteredCustomers = uniqueCustomers.filter((customer) => {
-    const matchesName = customer.name.toLowerCase().includes(filterName.toLowerCase())
-    const hasMatchingOrder = customer.orders.some((order) => {
-      const matchesColor = filterColor === "All" || order.color === filterColor
-      const matchesSize = filterSize === "All" || order.size === filterSize
-      const matchesDesign = filterDesign === "All" || order.design === filterDesign
-      return matchesColor && matchesSize && matchesDesign
-    })
-    return matchesName && hasMatchingOrder
+const filteredCustomers = sortedCustomers.filter((customer) => {
+  const matchesName = customer.name.toLowerCase().includes(filterName.toLowerCase())
+  const hasMatchingOrder = customer.orders.some((order) => {
+    const matchesColor = filterColor === "All" || order.color === filterColor
+    const matchesSize = filterSize === "All" || order.size === filterSize
+    const matchesDesign = filterDesign === "All" || order.design === filterDesign
+    return matchesColor && matchesSize && matchesDesign
   })
+  return matchesName && hasMatchingOrder
+})
 
   const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage)
   const paginatedCustomers = filteredCustomers.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage)
@@ -864,9 +869,6 @@ onDeleteOrder={handleDeleteOrder}
     }
   }}
 />
-
-
-
 
 
    {/* ✅ Defective Items Dialog */}

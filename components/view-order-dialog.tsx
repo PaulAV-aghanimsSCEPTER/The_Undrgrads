@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useToast } from "@/components/ui/use-toast"
 import { createClient } from "@supabase/supabase-js"
+import { motion, AnimatePresence } from "framer-motion"
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -54,10 +55,11 @@ export default function ViewOrderDialog({
   onMarkDefective,
 }: ViewOrderDialogProps) {
   const { toast } = useToast()
-
   const sizes = ["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"]
 
   const [editingCustomer, setEditingCustomer] = useState(false)
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null)
+
   const [customerData, setCustomerData] = useState({
     name: customerName || "",
     phone: customerOrders[0]?.phone || "",
@@ -103,55 +105,80 @@ export default function ViewOrderDialog({
     }
   }
 
-// ✅ Add More Order (Fixed)
-const handleAddOrder = async () => {
-  const normalizedStatus =
-    newOrder.paymentStatus.toLowerCase() as "pending" | "partially paid" | "fully paid"
+  // ✅ Add More Order
+  const handleAddOrder = async () => {
+    const normalizedStatus =
+      newOrder.paymentStatus.toLowerCase() as "pending" | "partially paid" | "fully paid"
 
-  const orderToAdd: Order = {
-    id: Date.now(),
-    ...customerData,
-    color: newOrder.color,
-    size: newOrder.size,
-    design: newOrder.design,
-    payment_status: normalizedStatus,
-    price: Number(newOrder.price) || 0,
-    is_defective: false,
-    defective_note: "",
-  }
-
-  // ✅ Insert to Supabase correctly
-  const { error } = await supabase.from("orders").insert([
-    {
-      name: customerData.name,
-      phone: customerData.phone,
-      facebook: customerData.facebook,
-      chapter: customerData.chapter,
-      address: customerData.address,
+    const orderToAdd: Order = {
+      id: Date.now(),
+      ...customerData,
       color: newOrder.color,
       size: newOrder.size,
       design: newOrder.design,
-      payment_status: normalizedStatus, // fixed here
+      payment_status: normalizedStatus,
       price: Number(newOrder.price) || 0,
-      created_at: new Date().toISOString(),
-    },
-  ])
+      is_defective: false,
+      defective_note: "",
+    }
 
-  if (error) {
-    toast({
-      title: "Error adding order",
-      description: error.message,
-      variant: "destructive",
-    })
-    return
+    const { error } = await supabase.from("orders").insert([
+      {
+        name: customerData.name,
+        phone: customerData.phone,
+        facebook: customerData.facebook,
+        chapter: customerData.chapter,
+        address: customerData.address,
+        color: newOrder.color,
+        size: newOrder.size,
+        design: newOrder.design,
+        payment_status: normalizedStatus,
+        price: Number(newOrder.price) || 0,
+        created_at: new Date().toISOString(),
+      },
+    ])
+
+    if (error) {
+      toast({
+        title: "Error adding order",
+        description: error.message,
+        variant: "destructive",
+      })
+      return
+    }
+
+    onAddMoreOrder(orderToAdd)
+    setShowAddMoreForm(false)
+    toast({ title: "✅ Order added successfully!" })
   }
 
-  onAddMoreOrder(orderToAdd)
-  setShowAddMoreForm(false)
-  toast({ title: "✅ Order added successfully!" })
-}
+  // ✅ Edit Existing Order
+  const handleEditOrderSave = async () => {
+    if (!editingOrder) return
 
+    const { error } = await supabase
+      .from("orders")
+      .update({
+        color: editingOrder.color,
+        size: editingOrder.size,
+        design: editingOrder.design,
+        payment_status: editingOrder.payment_status,
+        price: editingOrder.price,
+      })
+      .eq("id", editingOrder.id)
 
+    if (error) {
+      toast({
+        title: "Error updating order",
+        description: error.message,
+        variant: "destructive",
+      })
+      return
+    }
+
+    toast({ title: "✅ Order updated successfully!" })
+    setEditingOrder(null)
+  }
 
   // ✅ Move to Trash
   const handleDeleteOrder = async (order: Order) => {
@@ -159,37 +186,16 @@ const handleAddOrder = async () => {
     const orderId = Number(order.id)
 
     try {
-      // 1️⃣ Move to trash_orders
-      const { error: insertError } = await supabase.from("trash_orders").insert([
-        {
-          name: order.name,
-          phone: order.phone,
-          facebook: order.facebook,
-          chapter: order.chapter,
-          address: order.address,
-          color: order.color,
-          size: order.size,
-          design: order.design,
-          price: order.price,
-          is_defective: order.is_defective ?? false,
-          defective_note: order.defective_note ?? null,
-          created_at: order.created_at ?? new Date().toISOString(),
-          deleted_at: new Date().toISOString(),
-          payment_status: order.payment_status ?? null,
-        },
+      await supabase.from("trash_orders").insert([
+        { ...order, deleted_at: new Date().toISOString() },
       ])
-      if (insertError) throw insertError
-
-      // 2️⃣ Delete from main table
-      const { error: deleteError } = await supabase.from("orders").delete().eq("id", orderId)
-      if (deleteError) throw deleteError
+      await supabase.from("orders").delete().eq("id", orderId)
 
       toast({ title: "Order moved to Trash successfully!" })
       setDeleteConfirmId(null)
     } catch (err: any) {
-      console.error("❌ Error moving order to trash_orders:", err)
       toast({
-        title: "Error",
+        title: "Error moving order to trash",
         description: err.message || String(err),
         variant: "destructive",
       })
@@ -197,42 +203,36 @@ const handleAddOrder = async () => {
   }
 
   // ✅ Mark Defective
-const handleMarkDefective = async (orderId: number) => {
-  const { error } = await supabase
-    .from("orders")
-    .update({ is_defective: true, defective_note: defectiveNote })
-    .eq("id", orderId)
+  const handleMarkDefective = async (orderId: number) => {
+    const { error } = await supabase
+      .from("orders")
+      .update({ is_defective: true, defective_note: defectiveNote })
+      .eq("id", orderId)
 
-  if (error) {
+    if (error) {
+      toast({
+        title: "Error marking defective",
+        description: error.message,
+        variant: "destructive",
+      })
+      return
+    }
+
+    onMarkDefective(orderId, defectiveNote)
+    setShowDefectiveNote(false)
+    setSelectedOrderId(null)
+    setDefectiveNote("")
     toast({
-      title: "Error marking defective",
-      description: error.message,
-      variant: "destructive",
+      title: "✅ Order marked as defective!",
+      description: "It has been moved to the Defective Items list.",
     })
-    return
   }
-
-  // Call parent handler so main dashboard updates
-  onMarkDefective(orderId, defectiveNote)
-
-  // Close note UI instantly
-  setShowDefectiveNote(false)
-  setSelectedOrderId(null)
-  setDefectiveNote("")
-
-  toast({
-    title: "✅ Order marked as defective!",
-    description: "It has been moved to the Defective Items list.",
-  })
-}
-
 
   if (!open) return null
 
   return (
     <div className="fixed inset-0 bg-black/20 backdrop-blur-sm flex items-center justify-center z-50 p-3 sm:p-6 overflow-y-auto">
       <div className="bg-white rounded-2xl shadow-lg p-5 sm:p-8 w-full max-w-3xl">
-
         {/* 🧾 Customer Info */}
         <div className="mb-6 bg-gray-50 rounded-lg p-4 border">
           <h2 className="text-lg font-semibold mb-3">Customer Details</h2>
@@ -253,8 +253,9 @@ const handleMarkDefective = async (orderId: number) => {
           ) : (
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center">
               <div className="text-sm text-gray-700">
-                <p><strong>Phone:</strong> {customerData.phone || "—"}</p>
+                <p><strong>Name:</strong> {customerData.name || "—"}</p>
                 <p><strong>Facebook:</strong> {customerData.facebook || "—"}</p>
+                <p><strong>Phone:</strong> {customerData.phone || "—"}</p>
                 <p><strong>Chapter:</strong> {customerData.chapter || "—"}</p>
                 <p><strong>Address:</strong> {customerData.address || "—"}</p>
               </div>
@@ -263,7 +264,7 @@ const handleMarkDefective = async (orderId: number) => {
           )}
         </div>
 
-        {/* 🧩 Orders */}
+        {/* 🧩 Orders List */}
         <div className="mb-6">
           <h2 className="text-lg font-semibold mb-3">Orders ({customerOrders.length})</h2>
           <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
@@ -271,55 +272,35 @@ const handleMarkDefective = async (orderId: number) => {
               <div key={order.id} className="p-3 border rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white shadow-sm">
                 <div className="flex-1 text-sm text-gray-800">
                   <div><strong>{order.color}</strong> – {order.size} – {order.design}</div>
-                  <div className="flex items-center gap-1">
-  <strong>Status:</strong>
-  <span
-    className={
-      order.payment_status === "fully paid"
-        ? "text-green-600 font-semibold"
-        : order.payment_status === "partially paid"
-        ? "text-yellow-600 font-semibold"
-        : "text-gray-600 font-semibold"
-    }
-  >
-    {order.payment_status
-      ? order.payment_status
-          .split(" ")
-          .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-          .join(" ")
-      : "Pending"}
-  </span>
-</div>
-
+                  <div>
+                    <strong>Status:</strong>{" "}
+                    <span
+                      className={
+                        order.payment_status === "fully paid"
+                          ? "text-green-600 font-semibold"
+                          : order.payment_status === "partially paid"
+                          ? "text-yellow-600 font-semibold"
+                          : "text-gray-600 font-semibold"
+                      }
+                    >
+                      {order.payment_status
+                        .split(" ")
+                        .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+                        .join(" ")}
+                    </span>
+                  </div>
                   <div>₱{order.price}</div>
-                  {order.is_defective && <div className="text-red-600">⚠ Defective: {order.defective_note}</div>}
                 </div>
 
                 <div className="flex gap-2 mt-2 sm:mt-0">
-                  <Button size="sm" variant="outline"
-                    onClick={() => {
-                      setSelectedOrderId(order.id)
-                      setShowDefectiveNote(!showDefectiveNote)
-                    }}
-                  >
-                    Mark Defective
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="destructive"
-                    onClick={() => setDeleteConfirmId(order.id)}
-                  >
-                    Delete
-                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => setEditingOrder(order)}>Edit</Button>
+                  <Button size="sm" variant="outline" onClick={() => { setSelectedOrderId(order.id); setShowDefectiveNote(!showDefectiveNote); }}>Mark Defective</Button>
+                  <Button size="sm" variant="destructive" onClick={() => setDeleteConfirmId(order.id)}>Delete</Button>
                 </div>
 
                 {selectedOrderId === order.id && showDefectiveNote && (
                   <div className="mt-2 w-full flex gap-2">
-                    <Input
-                      placeholder="Defective note (optional)"
-                      value={defectiveNote}
-                      onChange={e => setDefectiveNote(e.target.value)}
-                    />
+                    <Input placeholder="Defective note (optional)" value={defectiveNote} onChange={e => setDefectiveNote(e.target.value)} />
                     <Button className="bg-red-600 hover:bg-red-700" onClick={() => handleMarkDefective(order.id)}>Save</Button>
                   </div>
                 )}
@@ -328,7 +309,7 @@ const handleMarkDefective = async (orderId: number) => {
           </div>
         </div>
 
-        {/* ➕ Add Order */}
+        {/* ➕ Add Order Form */}
         {showAddMoreForm && (
           <div className="mb-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
             <h3 className="text-lg font-bold text-gray-800 mb-4 border-b border-blue-300 pb-1">🛍️ Add More Order</h3>
@@ -339,9 +320,7 @@ const handleMarkDefective = async (orderId: number) => {
               value={newOrder.color}
               onChange={(e) => setNewOrder({ ...newOrder, color: e.target.value })}
             >
-              {colors.map((color) => (
-                <option key={color} value={color}>{color}</option>
-              ))}
+              {colors.map(color => <option key={color} value={color}>{color}</option>)}
             </select>
 
             <label className="block text-sm font-semibold text-gray-700 mb-1">Size *</label>
@@ -350,9 +329,7 @@ const handleMarkDefective = async (orderId: number) => {
               value={newOrder.size}
               onChange={(e) => setNewOrder({ ...newOrder, size: e.target.value })}
             >
-              {sizes.map((size) => (
-                <option key={size} value={size}>{size}</option>
-              ))}
+              {sizes.map(size => <option key={size} value={size}>{size}</option>)}
             </select>
 
             <label className="block text-sm font-semibold text-gray-700 mb-1">Design *</label>
@@ -361,9 +338,7 @@ const handleMarkDefective = async (orderId: number) => {
               value={newOrder.design}
               onChange={(e) => setNewOrder({ ...newOrder, design: e.target.value })}
             >
-              {designs.map((design) => (
-                <option key={design} value={design}>{design}</option>
-              ))}
+              {designs.map(design => <option key={design} value={design}>{design}</option>)}
             </select>
 
             <label className="block text-sm font-semibold text-gray-700 mb-1">Payment Status *</label>
@@ -387,27 +362,14 @@ const handleMarkDefective = async (orderId: number) => {
             />
 
             <div className="flex justify-between">
-              <button
-                onClick={handleAddOrder}
-                className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-              >
-                Add Order
-              </button>
-              <button
-                onClick={() => setShowAddMoreForm(false)}
-                className="bg-gray-100 text-gray-700 px-4 py-2 rounded border hover:bg-gray-200"
-              >
-                Cancel
-              </button>
+              <button onClick={handleAddOrder} className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">Add Order</button>
+              <button onClick={() => setShowAddMoreForm(false)} className="bg-gray-100 text-gray-700 px-4 py-2 rounded border hover:bg-gray-200">Cancel</button>
             </div>
           </div>
         )}
 
         <div className="flex gap-2">
-          <Button
-            onClick={() => setShowAddMoreForm(!showAddMoreForm)}
-            className="bg-green-600 hover:bg-green-700 flex-1"
-          >
+          <Button onClick={() => setShowAddMoreForm(!showAddMoreForm)} className="bg-green-600 hover:bg-green-700 flex-1">
             {showAddMoreForm ? "Hide Form" : "Add More Order"}
           </Button>
           <Button onClick={() => onOpenChange(false)} variant="outline" className="flex-1">
@@ -415,6 +377,80 @@ const handleMarkDefective = async (orderId: number) => {
           </Button>
         </div>
 
+        {/* 📝 Edit Order Modal */}
+        <AnimatePresence>
+          {editingOrder && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="fixed inset-0 bg-black/40 flex items-center justify-center z-50"
+            >
+              <div className="bg-white p-6 rounded-lg shadow-lg max-w-md w-full">
+                <h3 className="font-semibold mb-3 text-gray-800">Edit Order</h3>
+
+                <div className="space-y-3">
+                  <label className="block text-sm font-medium">Color</label>
+                  <select
+                    className="w-full border p-2 rounded"
+                    value={editingOrder.color}
+                    onChange={(e) => setEditingOrder({ ...editingOrder, color: e.target.value })}
+                  >
+                    {colors.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+
+                  <label className="block text-sm font-medium">Size</label>
+                  <select
+                    className="w-full border p-2 rounded"
+                    value={editingOrder.size}
+                    onChange={(e) => setEditingOrder({ ...editingOrder, size: e.target.value })}
+                  >
+                    {sizes.map(s => <option key={s} value={s}>{s}</option>)}
+                  </select>
+
+                  <label className="block text-sm font-medium">Design</label>
+                  <select
+                    className="w-full border p-2 rounded"
+                    value={editingOrder.design}
+                    onChange={(e) => setEditingOrder({ ...editingOrder, design: e.target.value })}
+                  >
+                    {designs.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+
+                  <label className="block text-sm font-medium">Payment Status</label>
+                  <select
+                    className="w-full border p-2 rounded"
+                    value={editingOrder.payment_status}
+                    onChange={(e) => setEditingOrder({ ...editingOrder, payment_status: e.target.value as any })}
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="partially paid">Partially Paid</option>
+                    <option value="fully paid">Fully Paid</option>
+                  </select>
+
+                  <label className="block text-sm font-medium">Price</label>
+                  <input
+                    type="number"
+                    className="w-full border p-2 rounded"
+                    value={editingOrder.price}
+                    onChange={(e) => setEditingOrder({ ...editingOrder, price: Number(e.target.value) })}
+                  />
+                </div>
+
+                <div className="flex gap-2 mt-4">
+                  <Button onClick={handleEditOrderSave} className="bg-blue-600 hover:bg-blue-700 flex-1">
+                    Save
+                  </Button>
+                  <Button onClick={() => setEditingOrder(null)} variant="outline" className="flex-1">
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* 🗑️ Delete Confirmation */}
         {deleteConfirmId && (
           <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
             <div className="bg-white p-6 rounded-lg shadow-lg max-w-sm w-full">
