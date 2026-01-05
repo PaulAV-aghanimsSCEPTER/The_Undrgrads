@@ -38,7 +38,7 @@ export default function DefectiveItemsDialog({
           <DialogTitle className="text-xl font-semibold flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="text-green-600">🧩</span>
-              <span>Defective Items</span>
+              <span>Pending Items</span>
               <span className="bg-yellow-500 text-white text-xs px-2 py-0.5 rounded-full">
                 {defectiveOrders.length}
               </span>
@@ -48,7 +48,7 @@ export default function DefectiveItemsDialog({
 
         {defectiveOrders.length === 0 ? (
           <div className="text-center py-10 text-muted-foreground">
-            <p className="text-lg font-medium">No defective items found 🧼</p>
+            <p className="text-lg font-medium">No Pendings items found 🧼</p>
           </div>
         ) : (
           <div className="mt-4 overflow-x-auto border border-border rounded-lg">

@@ -23,7 +23,6 @@ import ColorByDesignChart from "@/components/ColorByDesignChart"
 import { toast } from "@/components/ui/use-toast"
 
 
-
 export default function Home() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
@@ -37,6 +36,7 @@ export default function Home() {
   const [trashOrders, setTrashOrders] = useState<Order[]>([])
   const [defectiveOrders, setDefectiveOrders] = useState<Order[]>([])
 
+
  const [designs, setDesigns] = useState<string[]>([])
   const [colors, setColors] = useState<string[]>([])
   const [sizes] = useState(["XS", "S", "M", "L", "XL", "2XL", "3XL", "4XL", "5XL"])
@@ -48,7 +48,7 @@ export default function Home() {
   const [filterDesign, setFilterDesign] = useState("All")
   const [currentPage, setCurrentPage] = useState(1)
   
-
+  
   const [showAddOrderDialog, setShowAddOrderDialog] = useState(false)
   const [showAddDesignDialog, setShowAddDesignDialog] = useState(false)
   const [showAddColorDialog, setShowAddColorDialog] = useState(false)
@@ -479,13 +479,62 @@ const filteredCustomers = sortedCustomers.filter((customer) => {
     : null
 
   // ✅ Delete a single order → Move to Trash
- const handleDeleteOrder = (orderId: number) => {
-    const orderToTrash = orders.find(o => o.id === orderId)
-    if (orderToTrash) {
-      setOrders(prev => prev.filter(o => o.id !== orderId))
-      setTrashOrders(prev => [...prev, orderToTrash])
+  const handleDeleteOrder = async (orderId: number) => {
+    const orderToTrash = orders.find((o) => o.id === orderId);
+    if (!orderToTrash) return;
+
+    // Create a new object with only the columns that exist in the trash_orders table
+    const trashOrderData = {
+      name: orderToTrash.name,
+      phone: orderToTrash.phone,
+      facebook: orderToTrash.facebook,
+      chapter: orderToTrash.chapter,
+      address: orderToTrash.address,
+      color: orderToTrash.color,
+      size: orderToTrash.size,
+      design: orderToTrash.design,
+      payment_status: orderToTrash.payment_status,
+      price: orderToTrash.price,
+      note: orderToTrash.note,
+      status: orderToTrash.status,
+      created_at: orderToTrash.created_at,
+      defective_note: orderToTrash.defective_note,
+      deleted_at: new Date().toISOString(),
+      is_defective: orderToTrash.is_defective,
+      is_deleted: true,
+      is_trashed: true,
+    };
+
+    try {
+      // 1. Move to trash_orders table
+      const { error: trashError } = await supabase
+        .from("trash_orders")
+        .insert([trashOrderData]);
+
+      if (trashError) throw trashError;
+
+      // 2. Delete from orders table
+      const { error: deleteError } = await supabase
+        .from("orders")
+        .delete()
+        .eq("id", orderId);
+      if (deleteError) throw deleteError;
+
+      // 3. Update local state
+      setOrders((prev) => prev.filter((o) => o.id !== orderId));
+      await fetchTrashOrders();
+      
+      toast({ title: "✅ Order moved to trash." });
+
+    } catch (err: any)      {
+      console.error("Error moving order to trash:", err.message);
+      toast({
+        title: "Error moving order to trash",
+        description: err.message,
+        variant: "destructive",
+      });
     }
-  }
+  };
 
 // Retrieve single order
 const handleRetrieveOrder = (orderId: number) => {
@@ -544,7 +593,6 @@ const handleMarkDefective = async (orderId: number, note: string = "") => {
   }
 
   // ✅ Delete All → Move to Trash
- // ✅ Delete All → Move to Trash (fixed)
 const handleDeleteAll = async () => {
   if (!confirm("Are you sure you want to delete all orders?")) return
 
@@ -746,22 +794,22 @@ onDeleteOrder={handleDeleteOrder}
 <TrashDialog
   open={isTrashOpen}
   onOpenChange={setIsTrashOpen}
-  
   trashOrders={trashOrders}
   onRetrieveOrder={async (orderId) => {
     try {
       // Get the order from trash
-      const { data: orderToRestore, error: fetchError } = await supabase
+      const { data: orderToRestoreResult, error: fetchError } = await supabase
         .from("trash_orders")
         .select("*")
         .eq("id", orderId)
-        .single()
 
       if (fetchError) throw fetchError
-      if (!orderToRestore) {
-        alert("Order not found in trash.")
+
+      if (!orderToRestoreResult || orderToRestoreResult.length === 0) {
+        toast({ title: "Order not found in trash.", variant: "destructive" })
         return
       }
+      const orderToRestore = orderToRestoreResult[0]
 
       // Move back to orders table
       const { error: insertError } = await supabase.from("orders").insert([
@@ -793,10 +841,14 @@ onDeleteOrder={handleDeleteOrder}
 
       await fetchOrders()
       await fetchTrashOrders()
-      alert("✅ Order successfully retrieved!")
+      toast({ title: "✅ Order successfully retrieved!" })
     } catch (err: any) {
       console.error("❌ Error retrieving order:", err.message)
-      alert("Failed to retrieve order.")
+      toast({
+        title: "Failed to retrieve order.",
+        description: err.message,
+        variant: "destructive",
+      })
     }
   }}
   onRetrieveAll={async () => {
@@ -808,7 +860,7 @@ onDeleteOrder={handleDeleteOrder}
 
       if (fetchError) throw fetchError
       if (!trashData || trashData.length === 0) {
-        alert("Trash is empty.")
+        toast({ title: "Trash is empty.", variant: "destructive" })
         return
       }
 
@@ -838,10 +890,14 @@ onDeleteOrder={handleDeleteOrder}
 
       await fetchOrders()
       await fetchTrashOrders()
-      alert("✅ All orders retrieved successfully!")
+      toast({ title: "✅ All orders retrieved successfully!" })
     } catch (err: any) {
       console.error("❌ Error retrieving all orders:", err.message)
-      alert("Failed to retrieve all orders.")
+      toast({
+        title: "Failed to retrieve all orders.",
+        description: err.message,
+        variant: "destructive",
+      })
     }
   }}
   onDeleteOrderPermanently={async (orderId) => {
@@ -850,10 +906,14 @@ onDeleteOrder={handleDeleteOrder}
       if (error) throw error
 
       await fetchTrashOrders()
-      alert("🗑️ Order permanently deleted.")
+      toast({ title: "🗑️ Order permanently deleted." })
     } catch (err: any) {
       console.error("❌ Error deleting order permanently:", err.message)
-      alert("Failed to delete order permanently.")
+      toast({
+        title: "Failed to delete order permanently.",
+        description: err.message,
+        variant: "destructive",
+      })
     }
   }}
   onDeleteAllPermanently={async () => {
@@ -862,13 +922,19 @@ onDeleteOrder={handleDeleteOrder}
       if (error) throw error
 
       await fetchTrashOrders()
-      alert("🗑️ All trash orders deleted permanently.")
+      toast({ title: "🗑️ All trash orders deleted permanently." })
     } catch (err: any) {
       console.error("❌ Error deleting all trash:", err.message)
-      alert("Failed to delete all trash.")
+      toast({
+        title: "Failed to delete all trash.",
+        description: err.message,
+        variant: "destructive",
+      })
     }
   }}
 />
+
+
 
 
    {/* ✅ Defective Items Dialog */}

@@ -48,7 +48,7 @@ export default function LoginDialog({ onLogin }: LoginDialogProps) {
               className="rounded-full"
               priority
             />
-            <h1 className="text-3xl font-bold text-gray-900">The Undergrads</h1>
+            <h1 className="text-3xl font-bold text-gray-900">TheUndergrads</h1>
           </div>
           <p className="text-gray-600">Order Management System</p>
         </div>
@@ -91,15 +91,7 @@ export default function LoginDialog({ onLogin }: LoginDialogProps) {
           </Button>
         </div>
 
-        <div className="mt-6 p-4 bg-blue-50 rounded-lg text-sm text-gray-600">
-          <p className="font-semibold mb-2">Login Credentials</p>
-          <p>
-            Username: <span className="font-mono">Adminname</span>
-          </p>
-          <p>
-            Password: <span className="font-mono">Pledgename</span>
-          </p>
-        </div>
+
       </Card>
     </div>
   )
