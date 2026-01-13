@@ -14,10 +14,17 @@ export interface Order {
   design: string
   qty?: number
   price: number
-  payment_status: "pending" | "partially paid" | "fully paid"
+  payment_status: "pending" | "partially paid" | "fully paid" | string
   created_at?: string
+  deleted_at?: string
+  is_deleted?: boolean
+  is_trashed?: boolean
+  is_defective?: boolean
   isDefective?: boolean
+  defective_note?: string
   defectiveNote?: string
+  batch?: string
+  batch_folder?: string
 }
 
 interface TrashDialogProps {
@@ -43,11 +50,11 @@ export default function TrashDialog({
 
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 overflow-y-auto">
-      <div className="bg-white dark:bg-neutral-900 rounded-2xl shadow-xl p-6 max-w-2xl w-full mx-4 my-8 border border-gray-200 dark:border-neutral-700">
+      <div className="bg-card text-card-foreground rounded-2xl shadow-xl p-6 max-w-2xl w-full mx-4 my-8 border border-border">
         {/* Header */}
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-gray-800 dark:text-gray-100">
-            Trash ({trashOrders.length})
+          <h2 className="text-xl font-bold">
+            🗑️ Trash ({trashOrders.length})
           </h2>
           <div className="flex gap-2">
             <Button
@@ -72,27 +79,45 @@ export default function TrashDialog({
         {/* Trash List */}
         <div className="space-y-2 max-h-96 overflow-y-auto mb-4">
           {trashOrders.length === 0 ? (
-            <div className="text-center text-gray-500 py-8">
+            <div className="text-center text-muted-foreground py-8">
+              <span className="text-4xl block mb-2">🎉</span>
               Trash is empty
             </div>
           ) : (
             trashOrders.map((order) => (
               <div
                 key={order.id}
-                className="p-3 border border-gray-200 dark:border-neutral-700 rounded-lg flex justify-between items-center hover:bg-gray-50 dark:hover:bg-neutral-800 transition-colors"
+                className="p-3 border border-border rounded-lg flex justify-between items-center hover:bg-accent transition-colors"
               >
                 <div className="text-sm">
-                  <div className="font-medium text-gray-800 dark:text-gray-100">
+                  <div className="font-medium flex items-center gap-2 flex-wrap">
                     {order.name}
+                    {order.batch && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
+                        Batch: {order.batch}
+                      </span>
+                    )}
+                    {order.batch_folder && (
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+                        📁 {order.batch_folder}
+                      </span>
+                    )}
                   </div>
-                  <div className="text-gray-600 dark:text-gray-400 text-xs">
-                    {order.color} • {order.size} • {order.design}
+                  <div className="text-muted-foreground text-xs">
+                    {order.design} • {order.color} • {order.size}
                   </div>
 
                   {/* Defective Note */}
-                  {order.defectiveNote && (
+                  {(order.defectiveNote || order.defective_note) && (
                     <div className="text-xs text-red-500 mt-1 italic">
-                      Note: {order.defectiveNote}
+                      Note: {order.defectiveNote || order.defective_note}
+                    </div>
+                  )}
+
+                  {/* Deleted Date */}
+                  {order.deleted_at && (
+                    <div className="text-xs text-muted-foreground mt-1">
+                      Deleted: {new Date(order.deleted_at).toLocaleString()}
                     </div>
                   )}
                 </div>

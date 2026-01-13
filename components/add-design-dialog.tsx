@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { createClient } from "@supabase/supabase-js"
 
-// Initialize Supabase
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -39,7 +38,7 @@ export default function AddDesignDialog({
       if (error) throw error
 
       onAddDesign(newDesign)
-      setNewDesign("") // reset input to allow adding more designs
+      setNewDesign("")
       alert("🎨 Design added successfully!")
     } catch (err: any) {
       console.error("❌ Error adding design:", err.message)
@@ -68,6 +67,9 @@ export default function AddDesignDialog({
     }
   }
 
+  // Sort designs alphabetically
+  const sortedDesigns = [...existingDesigns].sort((a, b) => a.localeCompare(b))
+
   if (!open) return null
 
   return (
@@ -95,14 +97,14 @@ export default function AddDesignDialog({
           </div>
         </div>
 
-        {/* Existing Designs */}
+        {/* Existing Designs (sorted alphabetically) */}
         <div className="mb-4">
           <label className="block text-sm font-medium mb-2">Existing Designs</label>
           <div className="space-y-2 max-h-60 overflow-y-auto border rounded p-2">
-            {(!existingDesigns || existingDesigns.length === 0) && (
+            {(!sortedDesigns || sortedDesigns.length === 0) && (
               <p className="text-xs text-gray-500">No designs yet.</p>
             )}
-            {existingDesigns.map((design) => (
+            {sortedDesigns.map((design) => (
               <div
                 key={design}
                 className="flex justify-between items-center p-2 bg-gray-100 rounded"

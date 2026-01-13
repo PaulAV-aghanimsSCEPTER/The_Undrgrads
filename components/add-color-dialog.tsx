@@ -11,12 +11,11 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-
 interface AddColorDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onAddColor: (newColor: string) => void
-  onDeleteColor: (colorToDelete: string) => Promise<void>
+  onDeleteColor: (colorToDelete: string) => void
 }
 
 export default function AddColorDialog({
@@ -28,7 +27,7 @@ export default function AddColorDialog({
   const [newColor, setNewColor] = useState("")
   const [existingColors, setExistingColors] = useState<string[]>([])
 
-  // Fetch colors from Supabase
+  // Fetch colors from Supabase (alphabetical order)
   useEffect(() => {
     if (!open) return
 
@@ -36,13 +35,11 @@ export default function AddColorDialog({
       const { data, error } = await supabase
         .from("colors")
         .select("name")
-        .order("created_at", { ascending: true })
-        
+        .order("name", { ascending: true })
 
       if (error) {
         console.error("Failed to fetch colors:", error)
       } else if (data) {
-        // Remove duplicates
         const uniqueColors = Array.from(new Set(data.map((c) => c.name)))
         setExistingColors(uniqueColors)
       }
@@ -55,7 +52,6 @@ export default function AddColorDialog({
     const colorTrimmed = newColor.trim()
     if (!colorTrimmed) return
 
-    // Prevent duplicates locally
     if (existingColors.includes(colorTrimmed)) {
       alert("This color already exists.")
       return
@@ -70,13 +66,32 @@ export default function AddColorDialog({
       if (error) throw error
       if (data && data.length > 0) {
         const addedColor = data[0].name
-        setExistingColors((prev) => [...prev, addedColor])
+        setExistingColors((prev) =>
+          [...prev, addedColor].sort((a, b) => a.localeCompare(b))
+        )
         onAddColor(addedColor)
         setNewColor("")
       }
     } catch (err) {
       console.error("Failed to add color:", err)
       alert("Failed to add color. Maybe it already exists in database.")
+    }
+  }
+
+  const handleDelete = async (colorToDelete: string) => {
+    try {
+      const { error } = await supabase
+        .from("colors")
+        .delete()
+        .eq("name", colorToDelete)
+
+      if (error) throw error
+
+      setExistingColors((prev) => prev.filter((c) => c !== colorToDelete))
+      onDeleteColor(colorToDelete)
+    } catch (err) {
+      console.error("Failed to delete color:", err)
+      alert("Failed to delete color from database.")
     }
   }
 
@@ -109,10 +124,7 @@ export default function AddColorDialog({
             >
               <span>{color}</span>
               <button
-                onClick={async () => {
-                  await onDeleteColor(color)
-                  setExistingColors((prev) => prev.filter((c) => c !== color))
-                }}
+                onClick={() => handleDelete(color)}
                 className="text-red-500 hover:text-red-700"
               >
                 <X size={16} />

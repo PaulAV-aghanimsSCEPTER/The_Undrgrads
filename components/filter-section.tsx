@@ -12,6 +12,9 @@ interface FilterSectionProps {
   setFilterSize: (value: string) => void
   filterDesign: string
   setFilterDesign: (value: string) => void
+  filterPaymentStatus: string
+  setFilterPaymentStatus: (value: string) => void
+  paymentStatusOptions: string[]
   colors: string[]
   designs: string[]
   sizes: string[]
@@ -28,16 +31,28 @@ export default function FilterSection({
   setFilterSize,
   filterDesign,
   setFilterDesign,
+  filterPaymentStatus,
+  setFilterPaymentStatus,
+  paymentStatusOptions,
   colors,
   designs,
   sizes,
   onReset,
   onFilter,
 }: FilterSectionProps) {
+  // Format payment status for display
+  const formatPaymentStatus = (status: string) => {
+    if (status === "All") return "All"
+    if (status === "pending") return "No Confirmation"
+    if (status === "partially paid") return "Partially Paid"
+    if (status === "fully paid") return "Fully Paid"
+    return status
+  }
+
   return (
     <div className="bg-white p-3 sm:p-4 rounded-lg border border-gray-200 mb-6">
       <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Filters</h2>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2 sm:gap-4">
         <div>
           <label className="block text-xs sm:text-sm font-medium mb-1">Customer Name</label>
           <Input
@@ -62,11 +77,10 @@ export default function FilterSection({
           >
             <option>All</option>
             {[...new Set(colors)].map((c) => (
-  <option key={c} value={c}>
-    {c}
-  </option>
-))}
-
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
           </select>
         </div>
         <div>
@@ -101,6 +115,24 @@ export default function FilterSection({
             {designs.map((d) => (
               <option key={d} value={d}>
                 {d}
+              </option>
+            ))}
+          </select>
+        </div>
+        {/* Payment Status Filter */}
+        <div>
+          <label className="block text-xs sm:text-sm font-medium mb-1">Payment</label>
+          <select
+            value={filterPaymentStatus}
+            onChange={(e) => {
+              setFilterPaymentStatus(e.target.value)
+              onFilter()
+            }}
+            className="w-full px-2 sm:px-3 py-2 border border-gray-300 rounded-md text-xs sm:text-sm"
+          >
+            {paymentStatusOptions.map((status) => (
+              <option key={status} value={status}>
+                {formatPaymentStatus(status)}
               </option>
             ))}
           </select>
