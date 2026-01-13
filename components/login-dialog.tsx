@@ -35,24 +35,20 @@ export default function LoginDialog({ onLogin }: LoginDialogProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md p-8 shadow-lg">
-        {/* Header with logo + title */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-2">
-            <Image
-              src="/placeholder-logo.png" // your logo file inside /public
-              alt="The Undergrads Logo"
-              width={48}
-              height={48}
-              className="rounded-full"
-              priority
-            />
-            <h1 className="text-3xl font-bold text-gray-900">TheUndergrads</h1>
-          </div>
-          <p className="text-gray-600">Order Management System</p>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex flex-col items-center justify-center p-4">
+      {/* Logo above the card */}
+      <div className="mb-6">
+        <Image
+          src="/logo.png"
+          alt="Logo"
+          width={200}
+          height={200}
+          className="object-contain"
+          priority
+        />
+      </div>
 
+      <Card className="w-full max-w-md p-8 shadow-lg">
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
@@ -90,8 +86,6 @@ export default function LoginDialog({ onLogin }: LoginDialogProps) {
             Login
           </Button>
         </div>
-
-
       </Card>
     </div>
   )

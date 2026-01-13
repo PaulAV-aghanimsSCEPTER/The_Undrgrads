@@ -729,7 +729,17 @@ export default function Home() {
 
   // --- Render ---
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background relative">
+      {/* Background Logo Watermark */}
+      <div className="fixed inset-0 flex items-center justify-center pointer-events-none z-0">
+        <img
+          src="/logo.png"
+          alt=""
+          className="w-[500px] h-[500px] object-contain opacity-5"
+        />
+      </div>
+
+      <div className="relative z-10">
       <Header
         onAddOrder={() => setShowAddOrderDialog(true)}
         onAddDesign={() => setShowAddDesignDialog(true)}
@@ -1066,6 +1076,7 @@ export default function Home() {
         onOpenChange={setShowDesignsBreakdown} 
         orders={orders} 
       />
+      </div>
     </div>
   )
 }
