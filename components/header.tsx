@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button"
 import ThemeToggle from "@/components/theme-toggle"
 import {
   PlusCircle,
+  Archive,
   Palette,
   Layers,
   Trash2,
@@ -29,6 +30,7 @@ interface HeaderProps {
   onAddDesign: () => void
   onAddColor: () => void
   onManageStock: () => void
+  onArchiveAll: () => void
   onDeleteAll: () => void
   onViewTrash: () => void
   onLogout: () => void
@@ -43,6 +45,7 @@ export default function Header({
   onAddDesign,
   onAddColor,
   onManageStock,
+  onArchiveAll,
   onDeleteAll,
   onViewTrash,
   onLogout,
@@ -144,9 +147,13 @@ export default function Header({
                   <Trash2 className="mr-2 h-4 w-4 text-gray-600" />
                   View Trash
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={onArchiveAll}>
+                  <Archive className="mr-2 h-4 w-4 text-emerald-600" />
+                  Add All Orders to Previous
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={onDeleteAll}>
                   <Trash2 className="mr-2 h-4 w-4 text-red-600" />
-                  Delete All
+                  Delete All Orders
                 </DropdownMenuItem>
               </DropdownMenuGroup>
 

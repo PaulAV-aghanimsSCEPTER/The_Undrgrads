@@ -14,6 +14,7 @@ import {
   Pencil,
   RefreshCw,
   Trash2,
+  Archive,
   Plus,
   Save,
   FileText,
@@ -73,11 +74,14 @@ interface ViewOrderDialogProps {
   customerOrders: Order[]
   colors: string[]
   designs: string[]
+  previousFolders: string[]
   stocks?: StockItem[]
   onStockUpdate?: () => void
   onAddMoreOrder: (order: Order) => void
   onDeleteOrder: (orderId: number) => void
   onDeleteCustomer: (orderIds: number[]) => void | Promise<void>
+  onArchiveOrder: (orderId: number, previousFolder?: string) => void | Promise<void>
+  onArchiveCustomer: (orderIds: number[], previousFolder?: string) => void | Promise<void>
   onEditOrder: (order: Order) => void
   onMarkDefective: (orderId: number, note?: string) => void
   onEditCustomer: (customer: any) => void
@@ -90,11 +94,14 @@ export default function ViewOrderDialog({
   customerOrders,
   colors,
   designs,
+  previousFolders,
   stocks = [],
   onStockUpdate,
   onAddMoreOrder,
   onDeleteOrder,
   onDeleteCustomer,
+  onArchiveOrder,
+  onArchiveCustomer,
   onEditCustomer,
   onMarkDefective,
 }: ViewOrderDialogProps) {
@@ -131,6 +138,9 @@ export default function ViewOrderDialog({
   const [showDefectiveNotePopup, setShowDefectiveNotePopup] = useState(false)
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null)
   const [showDeleteCustomerConfirm, setShowDeleteCustomerConfirm] = useState(false)
+  const [archiveConfirmId, setArchiveConfirmId] = useState<number | null>(null)
+  const [showArchiveCustomerConfirm, setShowArchiveCustomerConfirm] = useState(false)
+  const [selectedPreviousFolder, setSelectedPreviousFolder] = useState("")
 
   // Use ref to track if we just added an order
   const justAddedOrder = useRef(false)
@@ -634,13 +644,24 @@ export default function ViewOrderDialog({
                   <Button
                     variant="ghost"
                     size="sm"
+                    className="h-7 shrink-0 px-2 text-xs text-blue-100 hover:bg-white/20 hover:text-white flex items-center gap-1"
+                    onClick={() => setShowArchiveCustomerConfirm(true)}
+                    disabled={customerOrders.length === 0}
+                    title="Move customer to previous orders"
+                  >
+                    <Archive className="w-4 h-4" />
+                    Previous
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     className="h-7 shrink-0 px-2 text-xs text-red-100 hover:bg-red-500/30 hover:text-white flex items-center gap-1"
                     onClick={() => setShowDeleteCustomerConfirm(true)}
                     disabled={customerOrders.length === 0}
                     title="Delete customer"
                   >
                     <Trash2 className="w-4 h-4" />
-                    Delete Customer
+                    Delete
                   </Button>
                 </div>
                 <p className="text-blue-200 text-sm">{customerOrders.length} order(s) - P{totalPrice.toLocaleString()}</p>
@@ -882,6 +903,14 @@ export default function ViewOrderDialog({
                             onClick={() => setShowStatusPopup(order.id)}
                           >
                             <RefreshCw className="w-3 h-3" /> Issue
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-6 rounded-full px-2 text-xs leading-none bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-300 dark:bg-emerald-900/30 dark:hover:bg-emerald-900/50 dark:text-emerald-400 dark:border-emerald-800 flex items-center gap-1"
+                            onClick={() => setArchiveConfirmId(order.id)}
+                          >
+                            <Archive className="w-3 h-3" /> Previous
                           </Button>
                           <Button
                             size="sm"
@@ -1278,6 +1307,83 @@ export default function ViewOrderDialog({
           )}
         </AnimatePresence>
 
+        {/* Archive Customer Confirmation */}
+        <AnimatePresence>
+          {showArchiveCustomerConfirm && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]"
+              onClick={() => setShowArchiveCustomerConfirm(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-card text-card-foreground p-6 rounded-xl shadow-2xl max-w-sm w-full mx-4 border border-border"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
+                    <Archive className="w-6 h-6 text-emerald-700 dark:text-emerald-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg">Move to Previous Orders</h3>
+                    <p className="text-sm text-muted-foreground">Hide from dashboard</p>
+                  </div>
+                </div>
+
+                <div className="bg-emerald-50 border border-emerald-200 dark:bg-emerald-900/30 dark:border-emerald-800 rounded-lg p-3 mb-4">
+                  <p className="text-sm text-emerald-700 dark:text-emerald-400">
+                    Move {customerData.name || "this customer"} and all {customerOrders.length} order(s) to Previous Orders?
+                    You can restore them later.
+                  </p>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-2">Previous Order Folder</label>
+                  <select
+                    value={selectedPreviousFolder}
+                    onChange={(event) => setSelectedPreviousFolder(event.target.value)}
+                    className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                  >
+                    <option value="">No folder</option>
+                    {previousFolders.map((folder) => (
+                      <option key={folder} value={folder}>
+                        {folder}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    onClick={async () => {
+                      await onArchiveCustomer(customerOrders.map((order) => order.id), selectedPreviousFolder)
+                      setShowArchiveCustomerConfirm(false)
+                      setSelectedPreviousFolder("")
+                    }}
+                    className="bg-emerald-600 hover:bg-emerald-700 flex-1 flex items-center justify-center gap-1"
+                  >
+                    <Archive className="w-4 h-4" /> Move
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setShowArchiveCustomerConfirm(false)
+                      setSelectedPreviousFolder("")
+                    }}
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Delete Customer Confirmation */}
         <AnimatePresence>
           {showDeleteCustomerConfirm && (
@@ -1323,6 +1429,82 @@ export default function ViewOrderDialog({
                     <Trash2 className="w-4 h-4" /> Delete
                   </Button>
                   <Button onClick={() => setShowDeleteCustomerConfirm(false)} variant="outline" className="flex-1">
+                    Cancel
+                  </Button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Archive Order Confirmation */}
+        <AnimatePresence>
+          {archiveConfirmId && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]"
+              onClick={() => setArchiveConfirmId(null)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-card text-card-foreground p-6 rounded-xl shadow-2xl max-w-sm w-full mx-4 border border-border"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
+                    <Archive className="w-6 h-6 text-emerald-700 dark:text-emerald-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-lg">Move Order</h3>
+                    <p className="text-sm text-muted-foreground">Send to Previous Orders</p>
+                  </div>
+                </div>
+
+                <div className="bg-emerald-50 border border-emerald-200 dark:bg-emerald-900/30 dark:border-emerald-800 rounded-lg p-3 mb-4">
+                  <p className="text-sm text-emerald-700 dark:text-emerald-400">
+                    This order will disappear from the dashboard and move to Previous Orders.
+                  </p>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-2">Previous Order Folder</label>
+                  <select
+                    value={selectedPreviousFolder}
+                    onChange={(event) => setSelectedPreviousFolder(event.target.value)}
+                    className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+                  >
+                    <option value="">No folder</option>
+                    {previousFolders.map((folder) => (
+                      <option key={folder} value={folder}>
+                        {folder}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex gap-2">
+                  <Button
+                    onClick={async () => {
+                      await onArchiveOrder(archiveConfirmId, selectedPreviousFolder)
+                      setArchiveConfirmId(null)
+                      setSelectedPreviousFolder("")
+                    }}
+                    className="bg-emerald-600 hover:bg-emerald-700 flex-1 flex items-center justify-center gap-1"
+                  >
+                    <Archive className="w-4 h-4" /> Move
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setArchiveConfirmId(null)
+                      setSelectedPreviousFolder("")
+                    }}
+                    variant="outline"
+                    className="flex-1"
+                  >
                     Cancel
                   </Button>
                 </div>

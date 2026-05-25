@@ -13,6 +13,7 @@ import AddDesignDialog from "@/components/add-design-dialog"
 import AddColorDialog from "@/components/add-color-dialog"
 import ViewOrderDialog from "@/components/view-order-dialog"
 import TrashDialog, { type Order } from "@/components/trash-dialog"
+import PreviousOrdersDialog from "@/components/previous-orders-dialog"
 import TShirtsBreakdownDialog from "@/components/tshirts-breakdown-dialog"
 import DesignsBreakdownDialog from "@/components/designs-breakdown-dialog"
 import DefectiveItemsDialog from "@/components/defective-items-dialog"
@@ -23,7 +24,17 @@ import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 import ColorByDesignChart from "@/components/ColorByDesignChart"
 import { toast } from "@/components/ui/use-toast"
-import { Folder, AlertTriangle } from "lucide-react"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Archive, Folder, AlertTriangle } from "lucide-react"
 
 // Unique separator that won't appear in user data
 const SEPARATOR = "|||"
@@ -37,6 +48,10 @@ export default function Home() {
   const [orders, setOrders] = useState<Order[]>([])
   const [isTrashOpen, setIsTrashOpen] = useState(false)
   const [trashOrders, setTrashOrders] = useState<Order[]>([])
+  const [isPreviousOrdersOpen, setIsPreviousOrdersOpen] = useState(false)
+  const [previousOrders, setPreviousOrders] = useState<Order[]>([])
+  const [previousFolders, setPreviousFolders] = useState<string[]>([])
+  const [archiveAllFolder, setArchiveAllFolder] = useState("")
   const [defectiveOrders, setDefectiveOrders] = useState<Order[]>([])
 
   const [designs, setDesigns] = useState<string[]>([])
@@ -66,6 +81,7 @@ export default function Home() {
   const [showTShirtsBreakdown, setShowTShirtsBreakdown] = useState(false)
   const [showDesignsBreakdown, setShowDesignsBreakdown] = useState(false)
   const [showStockDialog, setShowStockDialog] = useState(false)
+  const [showArchiveAllConfirm, setShowArchiveAllConfirm] = useState(false)
   const [stocks, setStocks] = useState<StockItem[]>([])
 
   const itemsPerPage = 10
@@ -448,6 +464,32 @@ export default function Home() {
     }
   }
 
+  const fetchPreviousOrders = async () => {
+    const { data, error } = await supabase
+      .from("previous_orders")
+      .select("*")
+      .order("archived_at", { ascending: false })
+
+    if (error) {
+      console.error("Error fetching previous_orders:", error)
+    } else {
+      setPreviousOrders(data || [])
+    }
+  }
+
+  const fetchPreviousFolders = async () => {
+    const { data, error } = await supabase
+      .from("previous_order_folders")
+      .select("*")
+      .order("name", { ascending: true })
+
+    if (error) {
+      console.error("Error fetching previous_order_folders:", error)
+    } else {
+      setPreviousFolders(data?.map((folder) => folder.name) || [])
+    }
+  }
+
   // Fetch Designs and Colors from Supabase (parallel)
   const fetchDesignsAndColors = async () => {
     const [{ data: designData }, { data: colorData }] = await Promise.all([
@@ -478,6 +520,8 @@ export default function Home() {
     ]).then(() => {
       // Load non-essential data after main content is ready
       fetchTrashOrders()
+      fetchPreviousOrders()
+      fetchPreviousFolders()
       fetchStocks()
     })
 
@@ -496,9 +540,25 @@ export default function Home() {
       })
       .subscribe()
 
+    const previousOrdersChannel = supabase
+      .channel("previous-orders-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "previous_orders" }, () => {
+        fetchPreviousOrders()
+      })
+      .subscribe()
+
+    const previousFoldersChannel = supabase
+      .channel("previous-order-folders-changes")
+      .on("postgres_changes", { event: "*", schema: "public", table: "previous_order_folders" }, () => {
+        fetchPreviousFolders()
+      })
+      .subscribe()
+
     return () => {
       supabase.removeChannel(channel)
       supabase.removeChannel(stockChannel)
+      supabase.removeChannel(previousOrdersChannel)
+      supabase.removeChannel(previousFoldersChannel)
     }
   }, [])
 
@@ -570,6 +630,13 @@ export default function Home() {
   // Count unique batch folders
   const uniqueFolderCount = Array.from(
     new Set(orders.filter((o) => o.batch_folder).map((o) => o.batch_folder))
+  ).length
+  const previousCustomerCount = Array.from(
+    new Set(
+      previousOrders.map(
+        (o) => `${o.name}${SEPARATOR}${o.phone || ""}${SEPARATOR}${o.facebook || ""}${SEPARATOR}${o.address || ""}`
+      )
+    )
   ).length
 
   // Delete a single order -> Move to Trash
@@ -689,6 +756,266 @@ export default function Home() {
         variant: "destructive",
       })
     }
+  }
+
+  const formatOrdersForArchive = (ordersToArchive: Order[], previousFolder = "") =>
+    ordersToArchive.map((order) => ({
+      name: order.name,
+      phone: order.phone,
+      facebook: order.facebook,
+      chapter: order.chapter,
+      address: order.address,
+      color: order.color,
+      size: order.size,
+      design: order.design,
+      payment_method: order.payment_method,
+      payment_status: order.payment_status,
+      price: order.price,
+      downpayment: order.downpayment || 0,
+      created_at: order.created_at,
+      defective_note: order.defective_note,
+      archived_at: new Date().toISOString(),
+      is_defective: order.is_defective,
+      is_deleted: false,
+      is_trashed: false,
+      batch: order.batch,
+      batch_folder: order.batch_folder,
+      previous_folder: previousFolder || null,
+    }))
+
+  const formatArchivedOrderForRestore = (order: Order) => ({
+    name: order.name,
+    phone: order.phone,
+    facebook: order.facebook,
+    chapter: order.chapter,
+    address: order.address,
+    color: order.color,
+    size: order.size,
+    design: order.design,
+    price: order.price,
+    downpayment: order.downpayment || 0,
+    is_defective: order.is_defective,
+    defective_note: order.defective_note,
+    payment_method: order.payment_method,
+    payment_status: order.payment_status,
+    batch: order.batch,
+    batch_folder: order.batch_folder,
+    created_at: order.created_at || new Date().toISOString(),
+  })
+
+  const handleArchiveOrders = async (orderIds: number[]) => {
+    await handleArchiveOrdersToFolder(orderIds, "")
+  }
+
+  const handleArchiveOrdersToFolder = async (orderIds: number[], previousFolder: string) => {
+    if (orderIds.length === 0) return
+
+    const ordersToArchive = orders.filter((order) => orderIds.includes(order.id))
+    if (ordersToArchive.length === 0) return
+
+    try {
+      const { error: archiveError } = await supabase
+        .from("previous_orders")
+        .insert(formatOrdersForArchive(ordersToArchive, previousFolder))
+
+      if (archiveError) throw archiveError
+
+      const { error: deleteError } = await supabase
+        .from("orders")
+        .delete()
+        .in("id", orderIds)
+
+      if (deleteError) throw deleteError
+
+      setOrders((prev) => prev.filter((order) => !orderIds.includes(order.id)))
+      setShowViewOrderDialog(false)
+      setSelectedCustomer(null)
+      await fetchPreviousOrders()
+
+      toast({
+        title:
+          ordersToArchive.length === 1
+            ? "Order moved to Previous Orders."
+            : `${ordersToArchive.length} orders moved to Previous Orders.`,
+      })
+    } catch (err: any) {
+      console.error("Error moving order to previous orders:", err.message)
+      toast({
+        title: "Error moving order to Previous Orders",
+        description: err.message,
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleCreatePreviousFolder = async (folderName: string) => {
+    const name = folderName.trim()
+    if (!name) return
+
+    const { error } = await supabase.from("previous_order_folders").insert([{ name }])
+    if (error) {
+      toast({ title: "Failed to create folder.", description: error.message, variant: "destructive" })
+      return
+    }
+
+    await fetchPreviousFolders()
+    toast({ title: "Previous Orders folder created." })
+  }
+
+  const handleRenamePreviousFolder = async (oldName: string, newName: string) => {
+    const name = newName.trim()
+    if (!oldName || !name || oldName === name) return
+
+    const { error: folderError } = await supabase
+      .from("previous_order_folders")
+      .update({ name })
+      .eq("name", oldName)
+
+    if (folderError) {
+      toast({ title: "Failed to rename folder.", description: folderError.message, variant: "destructive" })
+      return
+    }
+
+    const { error: ordersError } = await supabase
+      .from("previous_orders")
+      .update({ previous_folder: name })
+      .eq("previous_folder", oldName)
+
+    if (ordersError) {
+      toast({ title: "Folder renamed, but orders were not moved.", description: ordersError.message, variant: "destructive" })
+    }
+
+    await Promise.all([fetchPreviousFolders(), fetchPreviousOrders()])
+    toast({ title: "Previous Orders folder renamed." })
+  }
+
+  const handleDeletePreviousFolder = async (folderName: string) => {
+    if (!folderName) return
+
+    const { error: ordersError } = await supabase
+      .from("previous_orders")
+      .update({ previous_folder: null })
+      .eq("previous_folder", folderName)
+
+    if (ordersError) {
+      toast({ title: "Failed to clear folder orders.", description: ordersError.message, variant: "destructive" })
+      return
+    }
+
+    const { error: folderError } = await supabase
+      .from("previous_order_folders")
+      .delete()
+      .eq("name", folderName)
+
+    if (folderError) {
+      toast({ title: "Failed to delete folder.", description: folderError.message, variant: "destructive" })
+      return
+    }
+
+    await Promise.all([fetchPreviousFolders(), fetchPreviousOrders()])
+    toast({ title: "Previous Orders folder deleted." })
+  }
+
+  const handleMovePreviousOrdersToFolder = async (orderIds: number[], folderName: string) => {
+    if (orderIds.length === 0) return
+
+    const { error } = await supabase
+      .from("previous_orders")
+      .update({ previous_folder: folderName || null })
+      .in("id", orderIds)
+
+    if (error) {
+      toast({ title: "Failed to move previous orders.", description: error.message, variant: "destructive" })
+      return
+    }
+
+    await fetchPreviousOrders()
+    toast({ title: "Previous orders moved." })
+  }
+
+  const handleRetrievePreviousOrders = async (orderIds: number[]) => {
+    if (orderIds.length === 0) return
+
+    try {
+      const { data: previousData, error: fetchError } = await supabase
+        .from("previous_orders")
+        .select("*")
+        .in("id", orderIds)
+
+      if (fetchError) throw fetchError
+      if (!previousData || previousData.length === 0) {
+        toast({ title: "Order not found in Previous Orders.", variant: "destructive" })
+        return
+      }
+
+      const { error: insertError } = await supabase
+        .from("orders")
+        .insert(previousData.map(formatArchivedOrderForRestore))
+
+      if (insertError) throw insertError
+
+      const { error: deleteError } = await supabase
+        .from("previous_orders")
+        .delete()
+        .in("id", orderIds)
+
+      if (deleteError) throw deleteError
+
+      await fetchOrders()
+      await fetchPreviousOrders()
+      toast({
+        title:
+          previousData.length === 1
+            ? "Order restored to dashboard."
+            : `${previousData.length} orders restored to dashboard.`,
+      })
+    } catch (err: any) {
+      console.error("Error retrieving previous orders:", err.message)
+      toast({
+        title: "Failed to retrieve previous orders.",
+        description: err.message,
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleDeletePreviousOrdersPermanently = async (orderIds: number[]) => {
+    if (orderIds.length === 0) return
+
+    try {
+      const { error } = await supabase.from("previous_orders").delete().in("id", orderIds)
+      if (error) throw error
+
+      await fetchPreviousOrders()
+      toast({
+        title:
+          orderIds.length === 1
+            ? "Previous order permanently deleted."
+            : `${orderIds.length} previous orders permanently deleted.`,
+      })
+    } catch (err: any) {
+      console.error("Error deleting previous orders:", err.message)
+      toast({
+        title: "Failed to delete previous orders.",
+        description: err.message,
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleArchiveAll = async () => {
+    if (!orders.length) {
+      alert("No orders to move.")
+      return
+    }
+
+    setShowArchiveAllConfirm(true)
+  }
+
+  const confirmArchiveAll = async () => {
+    await handleArchiveOrdersToFolder(orders.map((order) => order.id), archiveAllFolder)
+    setShowArchiveAllConfirm(false)
+    setArchiveAllFolder("")
   }
 
   const handleMarkDefective = async (orderId: number, note: string = "") => {
@@ -825,6 +1152,7 @@ export default function Home() {
         onAddDesign={() => setShowAddDesignDialog(true)}
         onAddColor={() => setShowAddColorDialog(true)}
         onManageStock={() => setShowStockDialog(true)}
+        onArchiveAll={handleArchiveAll}
         onDeleteAll={handleDeleteAll}
         onViewTrash={() => setIsTrashOpen(true)}
         onLogout={handleLogout}
@@ -833,6 +1161,48 @@ export default function Home() {
         onExportOrdersPDF={handleExportOrdersPDF}
         onExportShippingInfo={handleExportShippingInfo}
       />
+
+      <AlertDialog open={showArchiveAllConfirm} onOpenChange={setShowArchiveAllConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
+                <Archive className="w-5 h-5 text-emerald-700 dark:text-emerald-300" />
+              </div>
+              <div>
+                <AlertDialogTitle>Add All Orders to Previous?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will move {orders.length} dashboard order(s) to Previous Orders and hide them from the main list.
+                </AlertDialogDescription>
+              </div>
+            </div>
+          </AlertDialogHeader>
+          <div>
+            <label className="text-sm font-medium mb-2 block">Folder</label>
+            <select
+              value={archiveAllFolder}
+              onChange={(event) => setArchiveAllFolder(event.target.value)}
+              className="w-full h-10 rounded-md border border-input bg-background px-3 text-sm"
+            >
+              <option value="">No folder</option>
+              {previousFolders.map((folder) => (
+                <option key={folder} value={folder}>
+                  {folder}
+                </option>
+              ))}
+            </select>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmArchiveAll}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              Add All
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Add Design Dialog */}
       <AddDesignDialog
@@ -899,6 +1269,17 @@ export default function Home() {
               {defectiveOrders.length}
             </span>
           </button>
+
+          <button
+            className="bg-card hover:bg-muted/50 text-foreground border border-border px-4 py-2 rounded-lg transition flex items-center gap-2"
+            onClick={() => setIsPreviousOrdersOpen(true)}
+          >
+            <Archive className="w-4 h-4" />
+            Previous Orders
+            <span className="bg-muted text-muted-foreground font-bold rounded-full px-2 py-0.5 text-sm">
+              {previousCustomerCount}
+            </span>
+          </button>
         </div>
 
         <FilterSection
@@ -957,6 +1338,7 @@ export default function Home() {
         customerOrders={selectedCustomerObj?.orders || []}
         colors={colors}
         designs={designs}
+        previousFolders={previousFolders}
         stocks={stocks}
         onStockUpdate={fetchStocks}
         onAddMoreOrder={async () => {
@@ -964,9 +1346,79 @@ export default function Home() {
         }}
         onDeleteOrder={handleDeleteOrder}
         onDeleteCustomer={handleDeleteCustomer}
+        onArchiveOrder={(orderId, previousFolder) => handleArchiveOrdersToFolder([orderId], previousFolder || "")}
+        onArchiveCustomer={(orderIds, previousFolder) => handleArchiveOrdersToFolder(orderIds, previousFolder || "")}
         onEditOrder={() => {}}
         onMarkDefective={(orderId, note) => handleMarkDefective(orderId, note || "")}
         onEditCustomer={handleEditCustomer}
+      />
+
+      <PreviousOrdersDialog
+        open={isPreviousOrdersOpen}
+        onOpenChange={setIsPreviousOrdersOpen}
+        previousOrders={previousOrders}
+        folders={previousFolders}
+        onCreateFolder={handleCreatePreviousFolder}
+        onRenameFolder={handleRenamePreviousFolder}
+        onDeleteFolder={handleDeletePreviousFolder}
+        onMoveOrdersToFolder={handleMovePreviousOrdersToFolder}
+        onRetrieveOrder={(orderId) => handleRetrievePreviousOrders([orderId])}
+        onRetrieveOrders={handleRetrievePreviousOrders}
+        onRetrieveAll={async () => {
+          try {
+            const { data: previousData, error: fetchError } = await supabase
+              .from("previous_orders")
+              .select("*")
+
+            if (fetchError) throw fetchError
+            if (!previousData || previousData.length === 0) {
+              toast({ title: "Previous Orders is empty.", variant: "destructive" })
+              return
+            }
+
+            const { error: insertError } = await supabase
+              .from("orders")
+              .insert(previousData.map(formatArchivedOrderForRestore))
+
+            if (insertError) throw insertError
+
+            const { error: deleteError } = await supabase
+              .from("previous_orders")
+              .delete()
+              .neq("id", 0)
+
+            if (deleteError) throw deleteError
+
+            await fetchOrders()
+            await fetchPreviousOrders()
+            toast({ title: "All previous orders restored." })
+          } catch (err: any) {
+            console.error("Error retrieving previous orders:", err.message)
+            toast({
+              title: "Failed to retrieve previous orders.",
+              description: err.message,
+              variant: "destructive",
+            })
+          }
+        }}
+        onDeleteOrderPermanently={(orderId) => handleDeletePreviousOrdersPermanently([orderId])}
+        onDeleteOrdersPermanently={handleDeletePreviousOrdersPermanently}
+        onDeleteAllPermanently={async () => {
+          try {
+            const { error } = await supabase.from("previous_orders").delete().neq("id", 0)
+            if (error) throw error
+
+            await fetchPreviousOrders()
+            toast({ title: "All previous orders deleted permanently." })
+          } catch (err: any) {
+            console.error("Error deleting previous orders:", err.message)
+            toast({
+              title: "Failed to delete previous orders.",
+              description: err.message,
+              variant: "destructive",
+            })
+          }
+        }}
       />
 
       {/* Trash Dialog */}
